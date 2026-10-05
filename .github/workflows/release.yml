@@ -29,9 +29,16 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build Multiplatform Installers and Create GitHub Release
-    runs-on: macos-latest
+  # ----------------------------------------------------
+  # 1. Bump version & prepare release tag (Fast, 10s)
+  # ----------------------------------------------------
+  prepare-release:
+    name: Prepare Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve_version.outputs.tag }}
+      commit_sha: ${{ steps.resolve_version.outputs.commit_sha }}
+      title: ${{ steps.resolve_version.outputs.title }}
 
     steps:
       - name: Check out repository
@@ -42,14 +49,11 @@ jobs:
       - name: Resolve Release Tag & Semantic Version
         id: resolve_version
         run: |
-          # 1. If triggered by git tag push directly:
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG="${{ github.ref_name }}"
-          # 2. If triggered manually:
           elif [ "${{ github.event.inputs.bump }}" = "manual" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="${{ github.event.inputs.version }}"
           else
-            # Read current version from pubspec.yaml
             RAW_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2)
             BASE_VER=$(echo "$RAW_VER" | cut -d '+' -f 1)
             BUILD_NUM=$(echo "$RAW_VER" | cut -d '+' -f 2)
@@ -74,7 +78,6 @@ jobs:
                 PATCH=$((PATCH + 1))
                 ;;
               *)
-                # Default to existing pubspec version if unspecified
                 ;;
             esac
             
@@ -84,7 +87,7 @@ jobs:
             TAG="v$NEW_VER"
             
             echo "Bumping pubspec.yaml to $NEW_FULL_VER"
-            sed -i '' "s/^version: .*/version: $NEW_FULL_VER/" pubspec.yaml
+            sed -i "s/^version: .*/version: $NEW_FULL_VER/" pubspec.yaml
             
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -93,7 +96,6 @@ jobs:
             git push origin HEAD:main || true
           fi
           
-          # Clean tag string
           TAG=$(echo "$TAG" | xargs)
           if [[ "$TAG" != v* ]]; then
             TAG="v$TAG"
@@ -102,13 +104,26 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
           
-          # Title
           if [ -n "${{ github.event.inputs.release_title }}" ]; then
             TITLE="${{ github.event.inputs.release_title }}"
           else
             TITLE="My Warranties $TAG"
           fi
           echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+  # ----------------------------------------------------
+  # 2. Fast Parallel Android & Web Build (Ubuntu runner)
+  # ----------------------------------------------------
+  build-android-web:
+    name: Build Android & Web Installers
+    needs: prepare-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit_sha }}
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -126,49 +141,101 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run verification test suite
+      - name: Run test suite
         run: flutter test
 
-      - name: Build Android Release APK (Universal Mobile Installer)
+      - name: Build Android Release APK
         run: flutter build apk --release
 
-      - name: Build Android App Bundle (Google Play Store AAB)
+      - name: Build Android App Bundle (AAB)
         run: flutter build appbundle --release
-
-      - name: Build iOS Release (Unsigned IPA / Runner.app archive)
-        run: |
-          flutter build ios --release --no-codesign
-          cd build/ios/iphoneos
-          mkdir -p Payload
-          cp -r Runner.app Payload/
-          zip -r ../../../my_warranties_ios_${{ steps.resolve_version.outputs.tag }}_unsigned.ipa Payload
-          cd ../../..
 
       - name: Build Web release bundle
         run: |
           flutter build web --release
           cd build/web
-          tar -czf ../../my_warranties_web_${{ steps.resolve_version.outputs.tag }}.tar.gz .
+          tar -czf ../../my_warranties_web_${{ needs.prepare-release.outputs.tag }}.tar.gz .
           cd ../..
 
-      - name: Rename Android Installers with Version
+      - name: Rename Android Installers
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk my_warranties_android_${{ steps.resolve_version.outputs.tag }}.apk
-          cp build/app/outputs/bundle/release/app-release.aab my_warranties_android_${{ steps.resolve_version.outputs.tag }}.aab
+          cp build/app/outputs/flutter-apk/app-release.apk my_warranties_android_${{ needs.prepare-release.outputs.tag }}.apk
+          cp build/app/outputs/bundle/release/app-release.aab my_warranties_android_${{ needs.prepare-release.outputs.tag }}.aab
 
-      - name: Create GitHub Release and Upload Artifacts
+      - name: Upload Android & Web Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-web-installers
+          path: |
+            my_warranties_android_${{ needs.prepare-release.outputs.tag }}.apk
+            my_warranties_android_${{ needs.prepare-release.outputs.tag }}.aab
+            my_warranties_web_${{ needs.prepare-release.outputs.tag }}.tar.gz
+          retention-days: 1
+
+  # ----------------------------------------------------
+  # 3. Parallel iOS Build (macOS runner)
+  # ----------------------------------------------------
+  build-ios:
+    name: Build iOS IPA Package
+    needs: prepare-release
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit_sha }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS Release Unsigned IPA
+        run: |
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../my_warranties_ios_${{ needs.prepare-release.outputs.tag }}_unsigned.ipa Payload
+          cd ../../..
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-installer
+          path: my_warranties_ios_${{ needs.prepare-release.outputs.tag }}_unsigned.ipa
+          retention-days: 1
+
+  # ----------------------------------------------------
+  # 4. Collate Artifacts & Publish GitHub Release (Fast, 20s)
+  # ----------------------------------------------------
+  publish-release:
+    name: Publish GitHub Release
+    needs: [prepare-release, build-android-web, build-ios]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_files
+          merge-multiple: true
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.resolve_version.outputs.tag }}
-          target_commitish: ${{ steps.resolve_version.outputs.commit_sha }}
-          name: ${{ steps.resolve_version.outputs.title }}
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          target_commitish: ${{ needs.prepare-release.outputs.commit_sha }}
+          name: ${{ needs.prepare-release.outputs.title }}
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            my_warranties_android_${{ steps.resolve_version.outputs.tag }}.apk
-            my_warranties_android_${{ steps.resolve_version.outputs.tag }}.aab
-            my_warranties_ios_${{ steps.resolve_version.outputs.tag }}_unsigned.ipa
-            my_warranties_web_${{ steps.resolve_version.outputs.tag }}.tar.gz
+          files: release_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
