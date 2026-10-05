@@ -1026,7 +1026,7 @@ class SettingsScreen extends StatelessWidget {
                           Icon(
                             testSuccess == true
                                 ? CupertinoIcons.check_mark_circled_solid
-                                : CupertinoIcons.exclamationmark_circle_solid,
+                                : CupertinoIcons.exclamationmark_circle_fill,
                             size: 16,
                             color: testSuccess == true ? Pal.green : Pal.brick,
                           ),
