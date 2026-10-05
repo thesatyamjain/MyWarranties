@@ -62,8 +62,14 @@ class Onboarding extends StatelessWidget {
                   style: t.bodyMedium),
             ),
             const Spacer(flex: 2),
-            // ponytail: sign-in (phone OTP / Google / Apple, FR-26) arrives with Firebase.
-            FilledButton(onPressed: store.finishOnboarding, child: const Text('Get started')),
+            AppleBounce(
+              scaleFactor: 0.97,
+              onTap: store.finishOnboarding,
+              child: const SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: null, child: Text('Get started')),
+              ),
+            ),
             const SizedBox(height: 10),
             Center(child: Text('Your bills stay on this phone for now.', style: t.bodySmall)),
           ]),
@@ -102,7 +108,8 @@ class _ShellState extends State<Shell> {
                 child: Semantics(
                   button: true,
                   label: 'Add bill',
-                  child: GestureDetector(
+                  child: AppleBounce(
+                    scaleFactor: 0.90,
                     onTap: () => startAddFlow(context, s),
                     child: const Glass(
                       radius: 20,
@@ -285,34 +292,31 @@ class ItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(Pal.r),
-            onTap: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => Detail(s, i))),
-            child: Ink(
-              decoration: cardDecoration,
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(i.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 2),
-                    Text(
-                        [i.brand, 'Ends ${_date.format(i.endDate!)}']
-                            .where((e) => e.isNotEmpty)
-                            .join('  ·  '),
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ]),
-                ),
-                const SizedBox(width: 10),
-                StatusPill(i),
-              ]),
-            ),
+        child: AppleBounce(
+          scaleFactor: 0.97,
+          onTap: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => Detail(s, i))),
+          child: Container(
+            decoration: cardDecoration,
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(i.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(
+                      [i.brand, 'Ends ${_date.format(i.endDate!)}']
+                          .where((e) => e.isNotEmpty)
+                          .join('  ·  '),
+                      style: Theme.of(context).textTheme.bodySmall),
+                ]),
+              ),
+              const SizedBox(width: 10),
+              StatusPill(i),
+            ]),
           ),
         ),
       );

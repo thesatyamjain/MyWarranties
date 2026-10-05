@@ -174,3 +174,76 @@ const glassBackdrop = BoxDecoration(
     stops: [0, 0.55, 1],
   ),
 );
+
+/// Apple spring bounce micro-interaction on tap/press (iOS system touch feedback)
+class AppleBounce extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleFactor;
+  final Duration duration;
+
+  const AppleBounce({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scaleFactor = 0.96,
+    this.duration = const Duration(milliseconds: 140),
+  });
+
+  @override
+  State<AppleBounce> createState() => _AppleBounceState();
+}
+
+class _AppleBounceState extends State<AppleBounce> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleFactor).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    if (widget.onTap != null) _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    if (widget.onTap != null) {
+      _controller.reverse();
+      widget.onTap!();
+    }
+  }
+
+  void _onTapCancel() {
+    if (widget.onTap != null) _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onTap == null) return widget.child;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        ),
+        child: widget.child,
+      ),
+    );
+  }
+}
