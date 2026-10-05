@@ -48,14 +48,16 @@ List<Term> parsePrinted(String? text) {
   return out;
 }
 
-/// Order from the PRD: bill -> brand+model policy -> category default -> manual.
+/// Order from the PRD: bill -> AI brand lookup -> brand+model policy -> category default -> manual.
 List<Term> resolveWarranty(
     {required String name,
     required String brand,
     required String category,
-    String? printed}) {
+    String? printed,
+    List<Term>? aiTerms}) {
   final fromBill = parsePrinted(printed);
   if (fromBill.isNotEmpty) return fromBill;
+  if (aiTerms != null && aiTerms.isNotEmpty) return aiTerms;
   final brandMonths = _brandPolicy['${brand.toLowerCase()}|$category'];
   if (brandMonths != null) return [Term('Product', brandMonths, TermSource.brand)];
   for (final e in _categories.values) {

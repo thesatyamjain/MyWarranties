@@ -24,7 +24,7 @@ class Extraction {
 
 const _prompt = '''
 You read purchase bills / invoices (India: GST invoices, thermal store bills, marketplace invoices; English or Hindi).
-Return ONLY JSON of this shape. Use null when not printed; never guess. confidence is 0..1.
+Return ONLY JSON of this shape. Use null when not printed/known. confidence is 0..1.
 {"is_bill": true,
  "seller":{"value":str,"confidence":n},
  "invoice_no":{"value":str,"confidence":n},
@@ -33,7 +33,16 @@ Return ONLY JSON of this shape. Use null when not printed; never guess. confiden
  "tax":{"value":number,"confidence":n},
  "payment_mode":{"value":str,"confidence":n},
  "items":[{"product_name":str,"brand":str,"model":str,"serial_no":str,"price":number,
-           "printed_warranty":str or null,"confidence":n}]}
+           "printed_warranty":str or null,
+           "standard_warranty_terms":[{"label":str,"months":number,"source":"brand" or "estimated"}],
+           "confidence":n}]}
+
+For "standard_warranty_terms":
+- If standard brand/manufacturer warranty policy in India is known for this product/category/model, provide accurate breakdown in months.
+- E.g. TV -> [{"label":"Product","months":12,"source":"brand"},{"label":"Panel","months":24,"source":"brand"}]
+- E.g. AC -> [{"label":"Product","months":12,"source":"brand"},{"label":"Compressor","months":120,"source":"brand"}]
+- E.g. Smartphone -> [{"label":"Product","months":12,"source":"brand"}]
+- E.g. Washing machine -> [{"label":"Product","months":24,"source":"brand"},{"label":"Motor","months":120,"source":"brand"}]
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 

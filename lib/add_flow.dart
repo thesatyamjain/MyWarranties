@@ -219,7 +219,16 @@ class _ReviewState extends State<ReviewScreen> {
               name: '${i['product_name'] ?? ''}',
               brand: '${i['brand'] ?? ''}',
               category: guessCategory('${i['product_name'] ?? ''}'),
-              printed: i['printed_warranty'] as String?)
+              printed: i['printed_warranty'] as String?,
+              aiTerms: [
+                for (final t in (i['standard_warranty_terms'] as List? ?? []))
+                  if (t is Map && t['label'] != null && t['months'] != null)
+                    Term(
+                      '${t['label']}',
+                      (t['months'] as num).toInt(),
+                      t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand,
+                    ),
+              ])
     ];
     if (rows.isEmpty) rows.add(_Row());
   }
