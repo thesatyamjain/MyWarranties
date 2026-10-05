@@ -21,7 +21,7 @@ permissions:
 jobs:
   build-and-release:
     name: Build Multiplatform Installers and Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Check out repository
@@ -95,6 +95,15 @@ jobs:
       - name: Build Android App Bundle (Google Play Store AAB)
         run: flutter build appbundle --release
 
+      - name: Build iOS Release (Unsigned IPA / Runner.app archive)
+        run: |
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../my_warranties_ios_${{ steps.resolve_version.outputs.tag }}_unsigned.ipa Payload
+          cd ../../..
+
       - name: Build Web release bundle
         run: |
           flutter build web --release
@@ -118,6 +127,7 @@ jobs:
           files: |
             my_warranties_android_${{ steps.resolve_version.outputs.tag }}.apk
             my_warranties_android_${{ steps.resolve_version.outputs.tag }}.aab
+            my_warranties_ios_${{ steps.resolve_version.outputs.tag }}_unsigned.ipa
             my_warranties_web_${{ steps.resolve_version.outputs.tag }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
