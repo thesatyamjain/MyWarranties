@@ -3,12 +3,22 @@ name: Create Release
 on:
   workflow_dispatch:
     inputs:
+      bump:
+        type: choice
+        description: 'Semantic Version Bump type'
+        required: true
+        default: 'patch'
+        options:
+          - patch
+          - minor
+          - major
+          - manual
       version:
-        description: 'Release version tag (e.g. v1.1.0, or leave blank to auto-read from pubspec.yaml)'
+        description: 'Manual version tag (only used if bump type is "manual", e.g. v2.0.0)'
         required: false
         default: ''
       release_title:
-        description: 'Release Title (e.g. My Warranties v1.1.0)'
+        description: 'Custom Release Title (optional)'
         required: false
         default: ''
   push:
@@ -29,16 +39,58 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve Release Tag & Version
+      - name: Resolve Release Tag & Semantic Version
         id: resolve_version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            TAG="${{ github.event.inputs.version }}"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          # 1. If triggered by git tag push directly:
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG="${{ github.ref_name }}"
+          # 2. If triggered manually:
+          elif [ "${{ github.event.inputs.bump }}" = "manual" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
           else
-            PUBSPEC_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2 | cut -d '+' -f 1)
-            TAG="v$PUBSPEC_VER"
+            # Read current version from pubspec.yaml
+            RAW_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2)
+            BASE_VER=$(echo "$RAW_VER" | cut -d '+' -f 1)
+            BUILD_NUM=$(echo "$RAW_VER" | cut -d '+' -f 2)
+            if [ -z "$BUILD_NUM" ] || [ "$BUILD_NUM" = "$BASE_VER" ]; then
+              BUILD_NUM="1"
+            fi
+            
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VER"
+            BUMP="${{ github.event.inputs.bump }}"
+            
+            case "$BUMP" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+              *)
+                # Default to existing pubspec version if unspecified
+                ;;
+            esac
+            
+            BUILD_NUM=$((BUILD_NUM + 1))
+            NEW_VER="$MAJOR.$MINOR.$PATCH"
+            NEW_FULL_VER="$NEW_VER+$BUILD_NUM"
+            TAG="v$NEW_VER"
+            
+            echo "Bumping pubspec.yaml to $NEW_FULL_VER"
+            sed -i '' "s/^version: .*/version: $NEW_FULL_VER/" pubspec.yaml
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add pubspec.yaml
+            git commit -m "chore(release): bump version to $NEW_FULL_VER [skip ci]" || true
+            git push origin HEAD:main || true
           fi
           
           # Clean tag string
