@@ -65,9 +65,12 @@ class Onboarding extends StatelessWidget {
             AppleBounce(
               scaleFactor: 0.97,
               onTap: store.finishOnboarding,
-              child: const SizedBox(
+              child: SizedBox(
                 width: double.infinity,
-                child: FilledButton(onPressed: null, child: Text('Get started')),
+                child: FilledButton(
+                  onPressed: store.finishOnboarding,
+                  child: const Text('Get started'),
+                ),
               ),
             ),
             const SizedBox(height: 10),
