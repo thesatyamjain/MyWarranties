@@ -1,6 +1,16 @@
-name: Release Builder
+name: Create Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.1.0, or leave blank to auto-read from pubspec.yaml)'
+        required: false
+        default: ''
+      release_title:
+        description: 'Release Title (e.g. My Warranties v1.1.0)'
+        required: false
+        default: ''
   push:
     tags:
       - 'v*'
@@ -16,6 +26,49 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Release Tag & Version
+        id: resolve_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            PUBSPEC_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2 | cut -d '+' -f 1)
+            TAG="v$PUBSPEC_VER"
+          fi
+          
+          # Clean tag string
+          TAG=$(echo "$TAG" | xargs)
+          if [[ "$TAG" != v* ]]; then
+            TAG="v$TAG"
+          fi
+          
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          # Title
+          if [ -n "${{ github.event.inputs.release_title }}" ]; then
+            TITLE="${{ github.event.inputs.release_title }}"
+          else
+            TITLE="My Warranties $TAG"
+          fi
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag if triggered manually
+        run: |
+          TAG="${{ steps.resolve_version.outputs.tag }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Creating and pushing git tag $TAG"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Automated release $TAG"
+            git push origin "$TAG"
+          else
+            echo "Tag $TAG already exists."
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -40,17 +93,18 @@ jobs:
         run: |
           flutter build web --release
           cd build/web
-          tar -czf ../../my_warranties_web_${{ github.ref_name }}.tar.gz .
+          tar -czf ../../my_warranties_web_${{ steps.resolve_version.outputs.tag }}.tar.gz .
           cd ../..
 
       - name: Create GitHub Release and Upload Artifacts
         uses: softprops/action-gh-release@v2
         with:
-          name: "My Warranties ${{ github.ref_name }}"
+          tag_name: ${{ steps.resolve_version.outputs.tag }}
+          name: ${{ steps.resolve_version.outputs.title }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
-            my_warranties_web_${{ github.ref_name }}.tar.gz
+            my_warranties_web_${{ steps.resolve_version.outputs.tag }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
