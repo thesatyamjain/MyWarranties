@@ -56,44 +56,7 @@ jobs:
           else
             RAW_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2)
             BASE_VER=$(echo "$RAW_VER" | cut -d '+' -f 1)
-            BUILD_NUM=$(echo "$RAW_VER" | cut -d '+' -f 2)
-            if [ -z "$BUILD_NUM" ] || [ "$BUILD_NUM" = "$BASE_VER" ]; then
-              BUILD_NUM="1"
-            fi
-            
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VER"
-            BUMP="${{ github.event.inputs.bump }}"
-            
-            case "$BUMP" in
-              major)
-                MAJOR=$((MAJOR + 1))
-                MINOR=0
-                PATCH=0
-                ;;
-              minor)
-                MINOR=$((MINOR + 1))
-                PATCH=0
-                ;;
-              patch)
-                PATCH=$((PATCH + 1))
-                ;;
-              *)
-                ;;
-            esac
-            
-            BUILD_NUM=$((BUILD_NUM + 1))
-            NEW_VER="$MAJOR.$MINOR.$PATCH"
-            NEW_FULL_VER="$NEW_VER+$BUILD_NUM"
-            TAG="v$NEW_VER"
-            
-            echo "Bumping pubspec.yaml to $NEW_FULL_VER"
-            sed -i "s/^version: .*/version: $NEW_FULL_VER/" pubspec.yaml
-            
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add pubspec.yaml
-            git commit -m "chore(release): bump version to $NEW_FULL_VER [skip ci]" || true
-            git push origin HEAD:main || true
+            TAG="v$BASE_VER"
           fi
           
           TAG=$(echo "$TAG" | xargs)
