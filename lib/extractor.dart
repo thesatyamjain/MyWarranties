@@ -71,40 +71,58 @@ class DefaultBillExtractor implements BillExtractor {
       return Extraction(j);
     }
 
-    // 2. Direct Gemini Vision API with user key or build-time environment key
     final effectiveKey = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : _key;
     if (effectiveKey.isEmpty) {
-      throw StateError('Missing Gemini API Key. Please configure your API key in Settings or run with --dart-define=GEMINI_API_KEY=...');
+      throw StateError('Missing Gemini API Key. Open Settings > Gemini AI Configuration to enter your key.');
     }
-    final res = await http
-        .post(
-          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
-          headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': _prompt},
-                  {
-                    'inline_data': {
-                      'mime_type': file.path.toLowerCase().endsWith('.pdf')
-                          ? 'application/pdf'
-                          : 'image/jpeg',
-                      'data': base64Encode(await file.readAsBytes())
+    try {
+      final res = await http
+          .post(
+            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
+            headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': _prompt},
+                    {
+                      'inline_data': {
+                        'mime_type': file.path.toLowerCase().endsWith('.pdf')
+                            ? 'application/pdf'
+                            : 'image/jpeg',
+                        'data': base64Encode(await file.readAsBytes())
+                      }
                     }
-                  }
-                ]
-              }
-            ],
-            'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
-          }),
-        )
-        .timeout(const Duration(seconds: 45));
-    if (res.statusCode != 200) throw HttpException('Extraction failed (${res.statusCode})');
-    final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];
-    final j = jsonDecode(text) as Map<String, dynamic>;
-    if (j['is_bill'] == false) throw NotABill();
-    return Extraction(j);
+                  ]
+                }
+              ],
+              'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
+            }),
+          )
+          .timeout(const Duration(seconds: 45));
+
+      if (res.statusCode == 400 || res.statusCode == 403) {
+        throw StateError('Invalid Gemini API Key or permission denied. Please verify your key in Settings.');
+      } else if (res.statusCode == 429) {
+        throw StateError('Gemini API rate limit or quota exceeded. Please try again shortly.');
+      } else if (res.statusCode != 200) {
+        throw HttpException('Gemini error (${res.statusCode})');
+      }
+
+      final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];
+      final j = jsonDecode(text) as Map<String, dynamic>;
+      if (j['is_bill'] == false) throw NotABill();
+      return Extraction(j);
+    } on SocketException {
+      throw const SocketException('No internet connection. Please check your network and try again.');
+    } catch (e) {
+      if (e is NotABill || e is StateError || e is HttpException) rethrow;
+      final msg = e.toString();
+      if (msg.contains('SocketException') || msg.contains('Failed host lookup')) {
+        throw const SocketException('No internet connection. Please check your network and try again.');
+      }
+      rethrow;
+    }
   }
 }
 
