@@ -105,10 +105,12 @@ class _ShellState extends State<Shell> {
           extendBody: true,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
-            toolbarHeight: 52,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            toolbarHeight: 56,
             actions: [
               Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 20),
                 child: Semantics(
                   button: true,
                   label: 'Add bill',
@@ -116,11 +118,15 @@ class _ShellState extends State<Shell> {
                     scaleFactor: 0.90,
                     onTap: () => startAddFlow(context, s),
                     child: const Glass(
-                      radius: 20,
+                      radius: 22,
+                      blur: 20,
                       child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Icon(CupertinoIcons.add, color: Pal.blue, size: 22)),
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: Icon(CupertinoIcons.plus, color: Pal.blue, size: 22),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -273,6 +279,32 @@ class Home extends StatelessWidget {
             const SizedBox(height: 6),
             Text('Add your first bill. It takes about 30 seconds.',
                 textAlign: TextAlign.center, style: t.bodyMedium),
+            const SizedBox(height: 24),
+            AppleBounce(
+              onTap: () => startAddFlow(context, s),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Pal.blue,
+                  borderRadius: BorderRadius.circular(Pal.r),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Scan Bill',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ]),
         ),
       );
