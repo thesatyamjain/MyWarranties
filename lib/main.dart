@@ -581,6 +581,56 @@ class SettingsScreen extends StatelessWidget {
           ),
       ]),
       const SizedBox(height: 28),
+      Text('Gemini AI Configuration', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Use your own Gemini API key for instant bill extraction and policy lookups.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      Glass(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            Icon(
+              s.userApiKey.isNotEmpty ? Icons.key : Icons.key_off_outlined,
+              color: s.userApiKey.isNotEmpty ? Pal.green : Pal.muted,
+              size: 24,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  s.userApiKey.isNotEmpty
+                      ? 'Custom API Key active (•••${s.userApiKey.length > 4 ? s.userApiKey.substring(s.userApiKey.length - 4) : ""})'
+                      : 'No custom key configured',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                Text(
+                  s.userApiKey.isNotEmpty
+                      ? 'Saved securely on this device'
+                      : 'Will fall back to build-time key if available',
+                  style: const TextStyle(color: Pal.muted, fontSize: 12),
+                ),
+              ]),
+            ),
+            AppleBounce(
+              onTap: () => _editApiKey(context, s),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Pal.blue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Text(
+                  s.userApiKey.isNotEmpty ? 'Edit' : 'Add Key',
+                  style: const TextStyle(
+                      color: Pal.blue, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 28),
       Text('Backup and sync', style: t.titleSmall),
       const SizedBox(height: 4),
       // ponytail: cloud backup (FR-27) pending Firebase project config.
@@ -610,4 +660,46 @@ class SettingsScreen extends StatelessWidget {
       ),
     ]);
   }
+
+  void _editApiKey(BuildContext context, Store s) {
+    final controller = TextEditingController(text: s.userApiKey);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gemini API Key'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Enter your Google Gemini API key. It will be kept securely on your device for AI bill recognition.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            obscureText: true,
+            decoration: const InputDecoration(
+              hintText: 'AIzaSy...',
+              border: OutlineInputBorder(),
+              labelText: 'API Key',
+            ),
+          ),
+        ]),
+        actions: [
+          if (s.userApiKey.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                await s.setApiKey('');
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Clear', style: TextStyle(color: Colors.red)),
+            ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              await s.setApiKey(controller.text);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

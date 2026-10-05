@@ -51,14 +51,14 @@ Include every product line item. If the image is not a bill, return {"is_bill": 
 const _backendUrl = String.fromEnvironment('BACKEND_EXTRACT_URL');
 
 abstract class BillExtractor {
-  Future<Extraction> extract(File file);
+  Future<Extraction> extract(File file, {String? apiKey});
 }
 
 class DefaultBillExtractor implements BillExtractor {
   const DefaultBillExtractor();
 
   @override
-  Future<Extraction> extract(File file) async {
+  Future<Extraction> extract(File file, {String? apiKey}) async {
     // 1. If backend proxy is configured, use secure Cloud Function backend
     if (_backendUrl.isNotEmpty) {
       final req = http.MultipartRequest('POST', Uri.parse(_backendUrl))
@@ -71,14 +71,15 @@ class DefaultBillExtractor implements BillExtractor {
       return Extraction(j);
     }
 
-    // 2. Direct Gemini Vision API fallback
-    if (_key.isEmpty) {
-      throw StateError('Missing GEMINI_API_KEY (use --dart-define=GEMINI_API_KEY=...)');
+    // 2. Direct Gemini Vision API with user key or build-time environment key
+    final effectiveKey = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : _key;
+    if (effectiveKey.isEmpty) {
+      throw StateError('Missing Gemini API Key. Please configure your API key in Settings or run with --dart-define=GEMINI_API_KEY=...');
     }
     final res = await http
         .post(
           Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
-          headers: {'x-goog-api-key': _key, 'content-type': 'application/json'},
+          headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json'},
           body: jsonEncode({
             'contents': [
               {
@@ -109,6 +110,6 @@ class DefaultBillExtractor implements BillExtractor {
 
 const BillExtractor _defaultExtractor = DefaultBillExtractor();
 
-Future<Extraction> extractBill(File image, [BillExtractor extractor = _defaultExtractor]) =>
-    extractor.extract(image);
+Future<Extraction> extractBill(File image, {BillExtractor extractor = _defaultExtractor, String? apiKey}) =>
+    extractor.extract(image, apiKey: apiKey);
 

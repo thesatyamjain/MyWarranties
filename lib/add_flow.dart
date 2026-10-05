@@ -93,7 +93,7 @@ class _ProcessingState extends State<ProcessingScreen> {
   Future<void> _run() async {
     setState(() => error = null);
     try {
-      final ex = await extractBill(widget.file);
+      final ex = await extractBill(widget.file, apiKey: widget.store.userApiKey);
       if (!mounted) return;
       Navigator.pushReplacement(
           context,

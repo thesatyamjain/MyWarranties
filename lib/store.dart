@@ -17,6 +17,7 @@ class Store extends ChangeNotifier {
   List<Item> items = [];
   List<int> offsets = [30, 7, 0];
   bool onboarded = false;
+  String userApiKey = '';
   late SharedPreferences _p;
   final _n = FlutterLocalNotificationsPlugin();
 
@@ -30,9 +31,20 @@ class Store extends ChangeNotifier {
       offsets = List<int>.from(j['offsets'] ?? offsets);
     }
     onboarded = _p.getBool('onboarded') ?? false;
+    userApiKey = _p.getString('gemini_api_key') ?? '';
     if (!kIsWeb) {
       _initNotifications();
     }
+  }
+
+  Future<void> setApiKey(String key) async {
+    userApiKey = key.trim();
+    if (userApiKey.isEmpty) {
+      await _p.remove('gemini_api_key');
+    } else {
+      await _p.setString('gemini_api_key', userApiKey);
+    }
+    notifyListeners();
   }
 
   Future<void> _initNotifications() async {
