@@ -23,8 +23,11 @@ void main() {
   });
 
   test('status thresholds', () {
-    Item at(int daysLeft) => Item('i', 'b', 'n', '', '', '', 'Other', 0,
-        DateTime.now().subtract(Duration(days: 365 - daysLeft)), [Term('P', 12, TermSource.bill)]);
+    Item at(int daysLeft) {
+      final targetEnd = dayOnly(DateTime.now()).add(Duration(days: daysLeft));
+      final start = DateTime(targetEnd.year - 1, targetEnd.month, targetEnd.day);
+      return Item('i', 'b', 'n', '', '', '', 'Other', 0, start, [Term('P', 12, TermSource.bill)]);
+    }
     expect(at(90).status, WStatus.active);
     expect(at(30).status, WStatus.expiringSoon);
     expect(at(-5).status, WStatus.expired);
