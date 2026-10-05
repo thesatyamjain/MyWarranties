@@ -140,7 +140,10 @@ class _ProcessingState extends State<ProcessingScreen> {
             Text(
                 notBill
                     ? 'Try again with a photo of the full invoice or receipt.'
-                    : (error ?? '').replaceFirst('Bad state: ', ''),
+                    : (error ?? '')
+                        .replaceFirst('Bad state: ', '')
+                        .replaceFirst('HttpException: ', '')
+                        .replaceFirst('StateError: ', ''),
                 textAlign: TextAlign.center,
                 style: t.bodyMedium),
             const SizedBox(height: 20),

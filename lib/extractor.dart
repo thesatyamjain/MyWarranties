@@ -59,9 +59,10 @@ class DefaultBillExtractor implements BillExtractor {
   const DefaultBillExtractor();
 
   Future<http.Response> _postExtraction(String key, File file, String model) async {
+    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key');
     return await http
         .post(
-          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
+          uri,
           headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
           body: jsonEncode({
             'contents': [
@@ -103,15 +104,26 @@ class DefaultBillExtractor implements BillExtractor {
     if (effectiveKey.isEmpty) {
       throw StateError('Missing Gemini API Key. Open Settings > Gemini AI Configuration to enter your key.');
     }
+
+    const candidateModels = [
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-2.5-flash',
+    ];
+
     try {
-      var res = await _postExtraction(effectiveKey, file, _model);
-      if (res.statusCode == 404) {
-        // Fallback to gemini-1.5-flash if 2.0-flash is unavailable
-        res = await _postExtraction(effectiveKey, file, _fallbackModel);
+      http.Response? res;
+      for (final m in candidateModels) {
+        res = await _postExtraction(effectiveKey, file, m);
+        if (res.statusCode != 404) break;
       }
+      res ??= await _postExtraction(effectiveKey, file, candidateModels.first);
 
       if (res.statusCode == 400 || res.statusCode == 403) {
         throw StateError('Invalid Gemini API Key or permission denied. Please verify your key in Settings.');
+      } else if (res.statusCode == 404) {
+        throw StateError('Gemini model unavailable (404). Please verify your API key in Settings.');
       } else if (res.statusCode == 429) {
         throw StateError('Gemini API rate limit or quota exceeded. Please try again shortly.');
       } else if (res.statusCode != 200) {
