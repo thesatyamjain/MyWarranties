@@ -1,7 +1,6 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Design read: iOS system look. Grouped gray canvas, white inset cards with no
 /// border or shadow, one system-blue accent, semantic system colors for status.
