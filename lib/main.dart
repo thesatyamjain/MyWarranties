@@ -629,19 +629,135 @@ class SettingsScreen extends StatelessWidget {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 96), children: [
       Text('Settings', style: t.headlineMedium?.copyWith(fontSize: 34)),
       const SizedBox(height: 16),
-      Text('Remind me before expiry', style: t.titleSmall),
+      Text('Notifications & Alerts', style: t.titleSmall),
       const SizedBox(height: 4),
-      Text('Reminders arrive at 9:00 on the chosen day.', style: t.bodySmall),
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, children: [
-        for (final d in const [60, 30, 14, 7, 3, 1, 0])
-          FilterChip(
-            label: Text(d == 0 ? 'On expiry day' : d == 1 ? '1 day before' : '$d days before'),
-            selected: s.offsets.contains(d),
-            onSelected: (on) =>
-                s.setOffsets(on ? [...s.offsets, d] : s.offsets.where((x) => x != d).toList()),
-          ),
-      ]),
+      Text('Schedule automated local reminders before warranty periods elapse.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      Glass(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Pal.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(CupertinoIcons.bell_fill, color: Pal.blue, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.offsets.isEmpty
+                            ? 'Reminders muted'
+                            : '${s.offsets.length} alert interval${s.offsets.length > 1 ? "s" : ""} scheduled',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Delivered daily at 9:00 AM on scheduled days',
+                        style: TextStyle(color: Pal.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0x15000000)),
+            const SizedBox(height: 14),
+            Text(
+              'ALERT WINDOWS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                color: Pal.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 10,
+              children: [
+                for (final d in const [
+                  (60, '60 days'),
+                  (30, '30 days'),
+                  (14, '14 days'),
+                  (7, '7 days'),
+                  (3, '3 days'),
+                  (1, '1 day'),
+                  (0, 'Expiry day'),
+                ])
+                  AppleBounce(
+                    scaleFactor: 0.94,
+                    onTap: () {
+                      final has = s.offsets.contains(d.$1);
+                      s.setOffsets(has
+                          ? s.offsets.where((x) => x != d.$1).toList()
+                          : [...s.offsets, d.$1]);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: s.offsets.contains(d.$1)
+                            ? Pal.blue
+                            : Colors.white.withValues(alpha: 0.70),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: s.offsets.contains(d.$1)
+                              ? Pal.blue
+                              : Colors.white.withValues(alpha: 0.90),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: s.offsets.contains(d.$1)
+                                ? Pal.blue.withValues(alpha: 0.25)
+                                : Colors.black.withValues(alpha: 0.03),
+                            blurRadius: s.offsets.contains(d.$1) ? 8 : 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (s.offsets.contains(d.$1)) ...[
+                            const Icon(CupertinoIcons.checkmark_alt,
+                                size: 14, color: Colors.white),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            d.$2,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: s.offsets.contains(d.$1)
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: s.offsets.contains(d.$1)
+                                  ? Colors.white
+                                  : Pal.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
       const SizedBox(height: 28),
       Text('Gemini AI Configuration', style: t.titleSmall),
       const SizedBox(height: 4),
