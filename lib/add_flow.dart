@@ -140,7 +140,7 @@ class _ProcessingState extends State<ProcessingScreen> {
             Text(
                 notBill
                     ? 'Try again with a photo of the full invoice or receipt.'
-                    : '${error ?? ''}'.replaceFirst('Bad state: ', ''),
+                    : (error ?? '').replaceFirst('Bad state: ', ''),
                 textAlign: TextAlign.center,
                 style: t.bodyMedium),
             const SizedBox(height: 20),
@@ -200,7 +200,7 @@ class _ReviewState extends State<ReviewScreen> {
     final ex = widget.ex;
     conf = {for (final k in ['seller', 'invoice_no', 'purchase_date', 'total_amount']) k: ex.conf(k)};
     final manual = ex.raw.isEmpty || ex.items.length == 1 && ex.items.first.isEmpty;
-    if (manual) conf.updateAll((_, __) => 1); // nothing to doubt when the user types it
+    if (manual) conf.updateAll((_, _) => 1); // nothing to doubt when the user types it
     seller.text = '${ex.val('seller') ?? ''}';
     invoice.text = '${ex.val('invoice_no') ?? ''}';
     total.text = '${ex.val('total_amount') ?? ''}';

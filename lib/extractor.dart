@@ -46,37 +46,69 @@ For "standard_warranty_terms":
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 
-Future<Extraction> extractBill(File image) async {
-  if (_key.isEmpty) {
-    throw StateError('Missing GEMINI_API_KEY (use --dart-define=GEMINI_API_KEY=...)');
-  }
-  final res = await http
-      .post(
-        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
-        headers: {'x-goog-api-key': _key, 'content-type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': _prompt},
-                {
-                  'inline_data': {
-                    'mime_type': image.path.toLowerCase().endsWith('.pdf')
-                        ? 'application/pdf'
-                        : 'image/jpeg',
-                    'data': base64Encode(await image.readAsBytes())
-                  }
-                }
-              ]
-            }
-          ],
-          'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
-        }),
-      )
-      .timeout(const Duration(seconds: 45));
-  if (res.statusCode != 200) throw HttpException('Extraction failed (${res.statusCode})');
-  final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];
-  final j = jsonDecode(text) as Map<String, dynamic>;
-  if (j['is_bill'] == false) throw NotABill();
-  return Extraction(j);
+/// Production proxy endpoint (e.g. Firebase Cloud Function).
+/// If specified via --dart-define=BACKEND_EXTRACT_URL=..., bills are extracted securely via backend.
+const _backendUrl = String.fromEnvironment('BACKEND_EXTRACT_URL');
+
+abstract class BillExtractor {
+  Future<Extraction> extract(File file);
 }
+
+class DefaultBillExtractor implements BillExtractor {
+  const DefaultBillExtractor();
+
+  @override
+  Future<Extraction> extract(File file) async {
+    // 1. If backend proxy is configured, use secure Cloud Function backend
+    if (_backendUrl.isNotEmpty) {
+      final req = http.MultipartRequest('POST', Uri.parse(_backendUrl))
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+      final streamed = await req.send().timeout(const Duration(seconds: 45));
+      final res = await http.Response.fromStream(streamed);
+      if (res.statusCode != 200) throw HttpException('Extraction failed (${res.statusCode})');
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      if (j['is_bill'] == false) throw NotABill();
+      return Extraction(j);
+    }
+
+    // 2. Direct Gemini Vision API fallback
+    if (_key.isEmpty) {
+      throw StateError('Missing GEMINI_API_KEY (use --dart-define=GEMINI_API_KEY=...)');
+    }
+    final res = await http
+        .post(
+          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
+          headers: {'x-goog-api-key': _key, 'content-type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': _prompt},
+                  {
+                    'inline_data': {
+                      'mime_type': file.path.toLowerCase().endsWith('.pdf')
+                          ? 'application/pdf'
+                          : 'image/jpeg',
+                      'data': base64Encode(await file.readAsBytes())
+                    }
+                  }
+                ]
+              }
+            ],
+            'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
+          }),
+        )
+        .timeout(const Duration(seconds: 45));
+    if (res.statusCode != 200) throw HttpException('Extraction failed (${res.statusCode})');
+    final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];
+    final j = jsonDecode(text) as Map<String, dynamic>;
+    if (j['is_bill'] == false) throw NotABill();
+    return Extraction(j);
+  }
+}
+
+const BillExtractor _defaultExtractor = DefaultBillExtractor();
+
+Future<Extraction> extractBill(File image, [BillExtractor extractor = _defaultExtractor]) =>
+    extractor.extract(image);
+

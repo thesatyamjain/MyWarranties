@@ -144,4 +144,20 @@ class Store extends ChangeNotifier {
       }
     }
   }
+
+  /// Cloud sync provider hook (FR-27: Cloud Firestore & Firebase Auth sync).
+  CloudSyncProvider? cloudSync;
+
+  /// Trigger sync when online or cloud provider is connected.
+  Future<void> syncCloud() async {
+    if (cloudSync != null) {
+      await cloudSync!.sync(bills: bills, items: items);
+    }
+  }
 }
+
+/// Abstract contract for Cloud Sync (Firestore, Supabase, or custom API backend).
+abstract class CloudSyncProvider {
+  Future<void> sync({required List<Bill> bills, required List<Item> items});
+}
+

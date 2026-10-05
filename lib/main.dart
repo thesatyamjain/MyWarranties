@@ -27,7 +27,7 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
-        builder: (_, __) => MaterialApp(
+        builder: (context, _) => MaterialApp(
           title: 'My Warranties',
           debugShowCheckedModeBanner: false,
           theme: buildTheme(),
@@ -94,7 +94,7 @@ class _ShellState extends State<Shell> {
     final s = widget.store;
     return ListenableBuilder(
       listenable: s,
-      builder: (_, __) => Container(
+      builder: (context, _) => Container(
         decoration: glassBackdrop,
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -406,7 +406,7 @@ class Detail extends StatelessWidget {
   const Detail(this.s, this.i, {super.key});
   @override
   Widget build(BuildContext context) =>
-      ListenableBuilder(listenable: s, builder: (_, __) => _body(context));
+      ListenableBuilder(listenable: s, builder: (context, _) => _body(context));
 
   Widget _body(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -546,7 +546,7 @@ class Detail extends StatelessWidget {
                     height: 260,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(
+                    errorBuilder: (context, error, stackTrace) => const SizedBox(
                         height: 80, child: Center(child: Text('Bill image unavailable')))),
               ),
             ),
