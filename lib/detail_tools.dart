@@ -14,6 +14,19 @@ import 'theme.dart';
 Future<void> _shareFile(String path, String text) =>
     SharePlus.instance.share(ShareParams(files: [XFile(path)], text: text));
 
+/// Open/view the PDF bill in the system PDF viewer, or fallback to share sheet.
+Future<void> openBillPdf(Bill b) async {
+  try {
+    final uri = Uri.file(b.imagePath);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      return;
+    }
+  } catch (_) {}
+  // Fallback to native system share/open sheet
+  await SharePlus.instance.share(ShareParams(files: [XFile(b.imagePath)], text: 'Bill'));
+}
+
 /// FR-23: share the bill as a PDF (PDF bills are shared as-is).
 Future<void> shareBillPdf(Item i, Bill b) async {
   if (isPdf(b.imagePath)) return _shareFile(b.imagePath, 'Bill for ${i.name}');

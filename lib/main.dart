@@ -575,16 +575,114 @@ class Detail extends StatelessWidget {
                 onTap: () => showClaimSheet(context, s, i)),
           ]),
         ),
-        const SizedBox(height: 16),
-        if (bill != null && isPdf(bill.imagePath))
+        if (bill != null && isPdf(bill.imagePath)) ...[
+          Text('Bill Document', style: t.titleSmall),
+          const SizedBox(height: 8),
           Container(
+            padding: const EdgeInsets.all(16),
             decoration: cardDecoration,
-            child: ListTile(
-                leading: const Icon(CupertinoIcons.doc_richtext, color: Pal.muted),
-                title: const Text('Bill (PDF)'),
-                subtitle: const Text('Tap to open or share'),
-                onTap: () => shareBillPdf(i, bill)),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Pal.brick.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(CupertinoIcons.doc_fill, color: Pal.brick, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bill.invoiceNo.isNotEmpty
+                                ? 'Invoice #${bill.invoiceNo}'
+                                : 'Purchase Invoice (PDF)',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            bill.seller.isNotEmpty ? bill.seller : 'Official Receipt',
+                            style: const TextStyle(color: Pal.muted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1, color: Color(0x15000000)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppleBounce(
+                        scaleFactor: 0.95,
+                        onTap: () => openBillPdf(bill),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Pal.blue.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(CupertinoIcons.eye_fill, size: 16, color: Pal.blue),
+                              SizedBox(width: 6),
+                              Text(
+                                'Preview PDF',
+                                style: TextStyle(
+                                  color: Pal.blue,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: AppleBounce(
+                        scaleFactor: 0.95,
+                        onTap: () => shareBillPdf(i, bill),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(CupertinoIcons.share, size: 16, color: Pal.ink),
+                              SizedBox(width: 6),
+                              Text(
+                                'Share',
+                                style: TextStyle(
+                                  color: Pal.ink,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+        ],
         if (bill != null && !isPdf(bill.imagePath)) ...[
           Text('Bill', style: t.titleSmall),
           const SizedBox(height: 8),
