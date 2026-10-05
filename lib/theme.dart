@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Design read: iOS system look. Grouped gray canvas, white inset cards with no
 /// border or shadow, one system-blue accent, semantic system colors for status.
@@ -69,6 +70,13 @@ ThemeData buildTheme() {
       scrolledUnderElevation: 0,
       elevation: 0,
       foregroundColor: Pal.blue,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
     ),
     dialogTheme: DialogThemeData(
         backgroundColor: Pal.card,

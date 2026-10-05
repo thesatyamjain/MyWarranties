@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import 'add_flow.dart';
@@ -13,6 +14,14 @@ import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
   final store = Store();
   try {
     await store.load();
@@ -26,15 +35,24 @@ class App extends StatelessWidget {
   final Store store;
   const App(this.store, {super.key});
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) => MaterialApp(
-          title: 'My Warranties',
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(),
-          scrollBehavior: const MaterialScrollBehavior()
-              .copyWith(physics: const BouncingScrollPhysics()),
-          home: store.onboarded ? Shell(store) : Onboarding(store),
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) => MaterialApp(
+            title: 'My Warranties',
+            debugShowCheckedModeBanner: false,
+            theme: buildTheme(),
+            scrollBehavior: const MaterialScrollBehavior()
+                .copyWith(physics: const BouncingScrollPhysics()),
+            home: store.onboarded ? Shell(store) : Onboarding(store),
+          ),
         ),
       );
 }
@@ -108,6 +126,11 @@ class _ShellState extends State<Shell> {
             elevation: 0,
             scrolledUnderElevation: 0,
             toolbarHeight: 56,
+            systemOverlayStyle: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+            ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 20),
