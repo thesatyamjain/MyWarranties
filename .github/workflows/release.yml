@@ -100,6 +100,7 @@ jobs:
           fi
           
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
           
           # Title
           if [ -n "${{ github.event.inputs.release_title }}" ]; then
@@ -108,19 +109,6 @@ jobs:
             TITLE="My Warranties $TAG"
           fi
           echo "title=$TITLE" >> $GITHUB_OUTPUT
-
-      - name: Create Git Tag if triggered manually
-        run: |
-          TAG="${{ steps.resolve_version.outputs.tag }}"
-          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Creating and pushing git tag $TAG"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Automated release $TAG"
-            git push origin "$TAG"
-          else
-            echo "Tag $TAG already exists."
-          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -172,6 +160,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.resolve_version.outputs.tag }}
+          target_commitish: ${{ steps.resolve_version.outputs.commit_sha }}
           name: ${{ steps.resolve_version.outputs.title }}
           draft: false
           prerelease: false
