@@ -131,85 +131,95 @@ class _ShellState extends State<Shell> {
             SettingsScreen(s),
           ][tab]),
           bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(40, 0, 40, 12),
-              child: Glass(
-                radius: 32,
-                padding: const EdgeInsets.all(6),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const count = 3;
-                    final itemWidth = constraints.maxWidth / count;
-                    return Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        // Gliding indicator pill
-                        AnimatedAlign(
-                          duration: const Duration(milliseconds: 320),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment(-1.0 + (tab / (count - 1)) * 2.0, 0.0),
-                          child: Container(
-                            width: itemWidth,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(26),
-                              color: Colors.white.withValues(alpha: 0.85),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Tabs row
-                        Row(
-                          children: [
-                            for (final (i, d) in const [
-                              (CupertinoIcons.house, 'Home'),
-                              (CupertinoIcons.archivebox, 'Library'),
-                              (CupertinoIcons.gear, 'Settings'),
-                            ].indexed)
-                              Expanded(
-                                child: Semantics(
-                                  button: true,
-                                  selected: tab == i,
-                                  label: d.$2,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: () => setState(() => tab = i),
-                                    child: SizedBox(
-                                      height: 44,
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            d.$1,
-                                            size: 20,
-                                            color: tab == i ? Pal.blue : Pal.muted,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            d.$2,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: tab == i ? Pal.blue : Pal.muted,
-                                            ),
-                                          ),
-                                        ],
+            top: false,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: SizedBox(
+                    height: 56,
+                    child: Glass(
+                      radius: 28,
+                      padding: const EdgeInsets.all(4),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          const count = 3;
+                          final itemWidth = constraints.maxWidth / count;
+                          return Stack(
+                            alignment: Alignment.centerLeft,
+                            children: [
+                              // Gliding indicator pill
+                              AnimatedAlign(
+                                duration: const Duration(milliseconds: 320),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment(-1.0 + (tab / (count - 1)) * 2.0, 0.0),
+                                child: Container(
+                                  width: itemWidth,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
+                                    color: Colors.white.withValues(alpha: 0.90),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.06),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
                                       ),
-                                    ),
+                                    ],
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
+                              // Tabs row
+                              Row(
+                                children: [
+                                  for (final (i, d) in const [
+                                    (CupertinoIcons.house, 'Home'),
+                                    (CupertinoIcons.archivebox, 'Library'),
+                                    (CupertinoIcons.gear, 'Settings'),
+                                  ].indexed)
+                                    Expanded(
+                                      child: Semantics(
+                                        button: true,
+                                        selected: tab == i,
+                                        label: d.$2,
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: () => setState(() => tab = i),
+                                          child: SizedBox(
+                                            height: 48,
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  d.$1,
+                                                  size: 20,
+                                                  color: tab == i ? Pal.blue : Pal.muted,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  d.$2,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: tab == i ? Pal.blue : Pal.muted,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
