@@ -163,12 +163,28 @@ class _ShellState extends State<Shell> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(24),
-                                    color: Colors.white.withValues(alpha: 0.90),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white.withValues(alpha: 0.96),
+                                        Colors.white.withValues(alpha: 0.76),
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.90),
+                                      width: 1.0,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 10,
+                                        color: Pal.blue.withValues(alpha: 0.08),
+                                        blurRadius: 12,
                                         offset: const Offset(0, 3),
+                                      ),
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),

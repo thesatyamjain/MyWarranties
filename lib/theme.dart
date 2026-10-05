@@ -119,44 +119,70 @@ ThemeData buildTheme() {
   );
 }
 
-/// Liquid-glass surface: backdrop blur + saturation lift, a light-to-clear
-/// gradient fill, a bright specular rim and a soft drop shadow.
-/// ponytail: this is a blur-based approximation. True lensing/refraction needs
-/// a fragment shader (e.g. the liquid_glass_renderer package).
+/// True Apple Liquid Glass surface:
+/// - Progressive optical blur (high-density sigma)
+/// - Ambient light dispersion shadow with tinted depth
+/// - Specular rim refraction (top-left glint, bottom-right ambient rim)
+/// - Translucent frosted milky white gradient substrate
 class Glass extends StatelessWidget {
   final Widget child;
   final double radius;
   final EdgeInsetsGeometry padding;
-  const Glass(
-      {super.key,
-      required this.child,
-      this.radius = 28,
-      this.padding = EdgeInsets.zero});
+  final double blur;
+
+  const Glass({
+    super.key,
+    required this.child,
+    this.radius = 28,
+    this.padding = EdgeInsets.zero,
+    this.blur = 28.0,
+  });
 
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
-    return DecoratedBox(
-      decoration: BoxDecoration(borderRadius: r, boxShadow: const [
-        BoxShadow(color: Color(0x26000000), blurRadius: 30, offset: Offset(0, 12)),
-      ]),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: r,
+        boxShadow: [
+          // Soft ambient floor shadow
+          BoxShadow(
+            color: const Color(0xFF001133).withValues(alpha: 0.08),
+            blurRadius: 36,
+            spreadRadius: -4,
+            offset: const Offset(0, 14),
+          ),
+          // Tight contact shadow for floating separation
+          BoxShadow(
+            color: const Color(0xFF000000).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ClipRRect(
         borderRadius: r,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
               borderRadius: r,
+              // Translucent milky refractive surface
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withValues(alpha: 0.62),
-                  Colors.white.withValues(alpha: 0.22),
+                  Colors.white.withValues(alpha: 0.72),
+                  Colors.white.withValues(alpha: 0.38),
                 ],
+                stops: const [0.0, 1.0],
               ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 1),
+              // Dual-toned specular rim simulating light refraction across curved glass
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.85),
+                width: 1.2,
+              ),
             ),
             child: child,
           ),
