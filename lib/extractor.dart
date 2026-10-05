@@ -7,7 +7,8 @@ import 'package:http/http.dart' as http;
 /// ponytail: key ships in the client for MVP. Move the call behind a
 /// Cloud Function before any public release.
 const _key = String.fromEnvironment('GEMINI_API_KEY');
-const _model = 'gemini-2.5-flash';
+const _model = 'gemini-2.0-flash';
+const _fallbackModel = 'gemini-1.5-flash';
 
 class NotABill implements Exception {}
 
@@ -57,6 +58,33 @@ abstract class BillExtractor {
 class DefaultBillExtractor implements BillExtractor {
   const DefaultBillExtractor();
 
+  Future<http.Response> _postExtraction(String key, File file, String model) async {
+    return await http
+        .post(
+          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
+          headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': _prompt},
+                  {
+                    'inline_data': {
+                      'mime_type': file.path.toLowerCase().endsWith('.pdf')
+                          ? 'application/pdf'
+                          : 'image/jpeg',
+                      'data': base64Encode(await file.readAsBytes())
+                    }
+                  }
+                ]
+              }
+            ],
+            'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
+          }),
+        )
+        .timeout(const Duration(seconds: 45));
+  }
+
   @override
   Future<Extraction> extract(File file, {String? apiKey}) async {
     // 1. If backend proxy is configured, use secure Cloud Function backend
@@ -76,30 +104,11 @@ class DefaultBillExtractor implements BillExtractor {
       throw StateError('Missing Gemini API Key. Open Settings > Gemini AI Configuration to enter your key.');
     }
     try {
-      final res = await http
-          .post(
-            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
-            headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'parts': [
-                    {'text': _prompt},
-                    {
-                      'inline_data': {
-                        'mime_type': file.path.toLowerCase().endsWith('.pdf')
-                            ? 'application/pdf'
-                            : 'image/jpeg',
-                        'data': base64Encode(await file.readAsBytes())
-                      }
-                    }
-                  ]
-                }
-              ],
-              'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
-            }),
-          )
-          .timeout(const Duration(seconds: 45));
+      var res = await _postExtraction(effectiveKey, file, _model);
+      if (res.statusCode == 404) {
+        // Fallback to gemini-1.5-flash if 2.0-flash is unavailable
+        res = await _postExtraction(effectiveKey, file, _fallbackModel);
+      }
 
       if (res.statusCode == 400 || res.statusCode == 403) {
         throw StateError('Invalid Gemini API Key or permission denied. Please verify your key in Settings.');
@@ -137,32 +146,25 @@ Future<({bool ok, String message})> testApiKey(String apiKey) async {
   if (key.isEmpty) return (ok: false, message: 'Please enter an API key.');
   try {
     final res = await http
-        .post(
-          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
-          headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': 'ping'}
-                ]
-              }
-            ],
-            'generationConfig': {'maxOutputTokens': 5},
-          }),
+        .get(
+          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$key&pageSize=1'),
         )
         .timeout(const Duration(seconds: 10));
 
     if (res.statusCode == 200) {
       return (ok: true, message: 'API Key is valid and working!');
     } else if (res.statusCode == 400 || res.statusCode == 403) {
-      return (ok: false, message: 'Invalid API key or permission denied (HTTP ${res.statusCode}).');
+      return (ok: false, message: 'Invalid API key or unauthorized (HTTP ${res.statusCode}).');
     } else if (res.statusCode == 429) {
       return (ok: false, message: 'Quota exceeded or rate limited (HTTP 429).');
     } else {
       return (ok: false, message: 'Gemini service responded with error (${res.statusCode}).');
     }
   } catch (e) {
+    final msg = e.toString();
+    if (msg.contains('SocketException') || msg.contains('Failed host lookup')) {
+      return (ok: false, message: 'No internet connection. Please check your network.');
+    }
     return (ok: false, message: 'Network connection failed: $e');
   }
 }
