@@ -113,3 +113,39 @@ const BillExtractor _defaultExtractor = DefaultBillExtractor();
 Future<Extraction> extractBill(File image, {BillExtractor extractor = _defaultExtractor, String? apiKey}) =>
     extractor.extract(image, apiKey: apiKey);
 
+/// Fast, lightweight ping to test if a Gemini API key is valid and has quota.
+Future<({bool ok, String message})> testApiKey(String apiKey) async {
+  final key = apiKey.trim();
+  if (key.isEmpty) return (ok: false, message: 'Please enter an API key.');
+  try {
+    final res = await http
+        .post(
+          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent'),
+          headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {
+                'parts': [
+                  {'text': 'ping'}
+                ]
+              }
+            ],
+            'generationConfig': {'maxOutputTokens': 5},
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (res.statusCode == 200) {
+      return (ok: true, message: 'API Key is valid and working!');
+    } else if (res.statusCode == 400 || res.statusCode == 403) {
+      return (ok: false, message: 'Invalid API key or permission denied (HTTP ${res.statusCode}).');
+    } else if (res.statusCode == 429) {
+      return (ok: false, message: 'Quota exceeded or rate limited (HTTP 429).');
+    } else {
+      return (ok: false, message: 'Gemini service responded with error (${res.statusCode}).');
+    }
+  } catch (e) {
+    return (ok: false, message: 'Network connection failed: $e');
+  }
+}
+
