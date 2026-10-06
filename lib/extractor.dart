@@ -75,7 +75,18 @@ class DefaultBillExtractor implements BillExtractor {
   static String? _cachedWorkingModel;
   static String _cachedApiVer = 'v1beta';
 
-  Future<List<String>> _discoverModels(String key) async {
+  static List<String> candidateModels() => <String>{
+        ?_cachedWorkingModel,
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro',
+      }.toList();
+
+  static Future<List<String>> _discoverModels(String key) async {
     for (final ver in ['v1beta', 'v1']) {
       try {
         final client = http.Client();
@@ -114,7 +125,7 @@ class DefaultBillExtractor implements BillExtractor {
     return const [];
   }
 
-  String _parseErrorDetail(http.Response res) {
+  static String _parseErrorDetail(http.Response res) {
     try {
       final j = jsonDecode(res.body);
       if (j is Map && j['error'] is Map) {
@@ -193,16 +204,7 @@ class DefaultBillExtractor implements BillExtractor {
     }
 
     // Build model list: cached first, followed by standard fallback candidates
-    final candidateModels = <String>{
-      ?_cachedWorkingModel,
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-flash-8b',
-      'gemini-1.5-pro',
-    }.toList();
+    final candidateModels = DefaultBillExtractor.candidateModels();
 
     try {
       http.Response? res;
@@ -355,7 +357,6 @@ Return ONLY a JSON object in this exact shape:
 }
 ''';
 
-  final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$effectiveKey');
   final payload = jsonEncode({
     'contents': [
       {
@@ -365,15 +366,58 @@ Return ONLY a JSON object in this exact shape:
     'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0.1},
   });
 
+  final candidateModels = DefaultBillExtractor.candidateModels();
+  http.Response? res;
   final client = http.Client();
   try {
-    final res = await client.post(
-      uri,
-      headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json', 'Connection': 'close'},
-      body: payload,
-    ).timeout(const Duration(seconds: 25));
+    // 1. Try candidate models with current API version and v1/v1beta fallbacks
+    for (final m in candidateModels) {
+      for (final ver in [DefaultBillExtractor._cachedApiVer, DefaultBillExtractor._cachedApiVer == 'v1beta' ? 'v1' : 'v1beta']) {
+        final uri = Uri.parse('https://generativelanguage.googleapis.com/$ver/models/$m:generateContent?key=$effectiveKey');
+        try {
+          res = await client.post(
+            uri,
+            headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json', 'Connection': 'close'},
+            body: payload,
+          ).timeout(const Duration(seconds: 25));
 
-    if (res.statusCode == 200) {
+          if (res.statusCode == 200) {
+            DefaultBillExtractor._cachedWorkingModel = m;
+            DefaultBillExtractor._cachedApiVer = ver;
+            break;
+          }
+          if (res.statusCode != 404) break;
+        } catch (_) {}
+      }
+      if (res?.statusCode == 200) break;
+    }
+
+    // 2. If all candidate models returned 404, dynamically query what models are enabled on this key
+    if (res == null || res.statusCode == 404) {
+      final discovered = await DefaultBillExtractor._discoverModels(effectiveKey);
+      for (final m in discovered) {
+        if (candidateModels.contains(m)) continue;
+        for (final ver in ['v1beta', 'v1']) {
+          final uri = Uri.parse('https://generativelanguage.googleapis.com/$ver/models/$m:generateContent?key=$effectiveKey');
+          try {
+            res = await client.post(
+              uri,
+              headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json', 'Connection': 'close'},
+              body: payload,
+            ).timeout(const Duration(seconds: 25));
+
+            if (res.statusCode == 200) {
+              DefaultBillExtractor._cachedWorkingModel = m;
+              DefaultBillExtractor._cachedApiVer = ver;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (res?.statusCode == 200) break;
+      }
+    }
+
+    if (res != null && res.statusCode == 200) {
       final body = jsonDecode(res.body);
       final rawText = body['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
       final parsed = jsonDecode(rawText) as Map<String, dynamic>;
@@ -386,7 +430,8 @@ Return ONLY a JSON object in this exact shape:
         support: parsed['support']?.toString(),
       );
     } else {
-      throw HttpException('Gemini search failed (${res.statusCode})');
+      final detail = res != null ? DefaultBillExtractor._parseErrorDetail(res) : '';
+      throw HttpException(detail.isNotEmpty ? detail : 'Gemini search failed (${res?.statusCode ?? 404})');
     }
   } finally {
     client.close();

@@ -671,8 +671,12 @@ class _ReviewState extends State<ReviewScreen> {
       if (mounted) {
         setState(() {
           r.isSearchingWarranty = false;
-          final cleanErr = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '');
-          r.searchError = 'AI search note: $cleanErr';
+          final cleanErr = e is HttpException
+              ? 'Could not connect to warranty lookup service.'
+              : e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '').replaceAll('HttpException: ', '');
+          r.searchError = cleanErr.contains('404') || cleanErr.contains('Http')
+              ? 'Could not connect to warranty lookup service.'
+              : cleanErr;
           if (r.terms.isEmpty) {
             final fallback = resolveWarranty(
               name: name,
@@ -1146,8 +1150,8 @@ class _ItemCardState extends State<_ItemCard> {
               ),
             ),
 
-          // 3. Search Error / Notice
-          if (!r.isSearchingWarranty && r.searchError != null && r.searchError!.trim().isNotEmpty)
+          // 3. Search Error / Notice (only show if policy was not already verified or terms empty)
+          if (!r.isSearchingWarranty && r.searchError != null && r.searchError!.trim().isNotEmpty && (r.terms.isEmpty || r.aiSummary == null))
             Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(10),
