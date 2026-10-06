@@ -6,7 +6,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
@@ -52,7 +51,10 @@ Future<void> startAddFlow(BuildContext context, Store store) async {
   final picker = ImagePicker();
   final List<String> paths;
   if (src == 'pdf') {
-    final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf']);
+    final r = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
     paths = [for (final f in r) if (f.path != null) f.path!];
   } else if (src == 'gallery') {
     final multi = await picker.pickMultiImage(maxWidth: 1800, imageQuality: 80);
@@ -185,7 +187,7 @@ class _AddBillSheet extends StatelessWidget {
               Expanded(
                 child: _BentoSquareTile(
                   title: 'Files & PDF',
-                  subtitle: 'Invoices & e-receipts',
+                  subtitle: 'Single or batch PDFs',
                   icon: CupertinoIcons.doc_text_fill,
                   iconBg: const Color(0xFF0071A4).withValues(alpha: 0.12),
                   iconColor: const Color(0xFF0071A4),
@@ -450,14 +452,60 @@ class ProcessingScreen extends StatefulWidget {
   State<ProcessingScreen> createState() => _ProcessingState();
 }
 
-class _ProcessingState extends State<ProcessingScreen> {
+class _ProcessingState extends State<ProcessingScreen> with SingleTickerProviderStateMixin {
   String? error;
   bool notBill = false;
+  late AnimationController _scanController;
+  int _stepIndex = 0;
+  Timer? _stepTimer;
+
+  static const _telemetrySteps = [
+    (
+      icon: CupertinoIcons.viewfinder,
+      title: 'Scanning optical document layout...',
+      subtitle: 'Analyzing clarity and detecting page boundaries'
+    ),
+    (
+      icon: CupertinoIcons.doc_text_search,
+      title: 'Extracting invoice & transaction details...',
+      subtitle: 'Reading store, date, receipt ID & tax breakdown'
+    ),
+    (
+      icon: CupertinoIcons.cube_box,
+      title: 'Detecting products & hardware models...',
+      subtitle: 'Identifying line items, models and serial numbers'
+    ),
+    (
+      icon: CupertinoIcons.sparkles,
+      title: 'Consulting Gemini AI warranty intelligence...',
+      subtitle: 'Matching official manufacturer coverage policies'
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+
+    _stepTimer = Timer.periodic(const Duration(milliseconds: 2000), (timer) {
+      if (mounted && error == null && !notBill) {
+        setState(() {
+          _stepIndex = (_stepIndex + 1) % _telemetrySteps.length;
+        });
+      }
+    });
+
     _run();
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    _stepTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _run() async {
@@ -472,72 +520,349 @@ class _ProcessingState extends State<ProcessingScreen> {
     } on NotABill {
       if (mounted) setState(() => notBill = true);
     } catch (e) {
-      // Manual entry is always available (PRD risk table).
       if (mounted) setState(() => error = '$e');
     }
   }
 
+  void _manualEntry() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          store: widget.store,
+          file: widget.file,
+          ex: Extraction({'items': [{}]}),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
     final failed = error != null || notBill;
+    final currentStep = _telemetrySteps[_stepIndex];
+
     return DecoratedBox(
       decoration: glassBackdrop,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0),
-      body: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          ClipRRect(
-              borderRadius: BorderRadius.circular(Pal.r),
-              child: isPdf(widget.file.path)
-                  ? Container(
-                      height: 160,
-                      width: double.infinity,
-                      color: Pal.card,
-                      child: const Icon(CupertinoIcons.doc_richtext, size: 56, color: Pal.muted))
-                  : Image.file(widget.file, height: 220, fit: BoxFit.cover)),
-          const SizedBox(height: 28),
-          if (!failed) ...[
-            const CircularProgressIndicator(strokeWidth: 3),
-            const SizedBox(height: 20),
-            Text('Reading your bill', style: t.headlineSmall),
-            const SizedBox(height: 6),
-            Text('Finding the product, date and warranty. This takes a few seconds.',
-                textAlign: TextAlign.center, style: t.bodyMedium),
-          ] else ...[
-            Text(notBill ? 'That does not look like a bill' : 'Could not read this bill',
-                style: t.headlineSmall, textAlign: TextAlign.center),
-            const SizedBox(height: 6),
-            Text(
-                notBill
-                    ? 'Try again with a photo of the full invoice or receipt.'
-                    : (error ?? '')
-                        .replaceFirst('Bad state: ', '')
-                        .replaceFirst('HttpException: ', '')
-                        .replaceFirst('StateError: ', '')
-                        .replaceFirst('SocketException: ', '')
-                        .replaceFirst('ClientException: ', '')
-                        .replaceAll(RegExp(r',?\s*uri=https?:\S+'), ''),
-                textAlign: TextAlign.center,
-                style: t.bodyMedium),
-            const SizedBox(height: 20),
-            FilledButton(
-                onPressed: () => Navigator.pop(context), child: const Text('Try another photo')),
-            if (!notBill)
-              TextButton(
-                  onPressed: () => Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => ReviewScreen(
-                              store: widget.store, file: widget.file, ex: Extraction({'items': [{}]})))),
-                  child: const Text('Enter details manually')),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: const Icon(CupertinoIcons.xmark, color: Pal.ink, size: 20),
+            tooltip: 'Cancel',
+            onPressed: () => Navigator.pop(context),
+          ),
+          actions: [
+            if (!failed)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton(
+                  onPressed: _manualEntry,
+                  child: const Text('Manual Entry', style: TextStyle(color: Pal.blue, fontWeight: FontWeight.w600)),
+                ),
+              ),
           ],
-        ]),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Column(
+              children: [
+                const Spacer(),
+
+                // 1. Interactive Optical Document Scanner with Laser Beam
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Ambient diffuse glow
+                    Container(
+                      width: 250,
+                      height: 290,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: failed
+                                ? Pal.brick.withValues(alpha: 0.18)
+                                : Pal.blue.withValues(alpha: 0.22),
+                            blurRadius: 40,
+                            spreadRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Document frame
+                    LiquidGlassCard(
+                      radius: 22,
+                      padding: const EdgeInsets.all(8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            // Bill Image / PDF preview
+                            SizedBox(
+                              width: 240,
+                              height: 280,
+                              child: isPdf(widget.file.path)
+                                  ? Container(
+                                      color: Pal.paper,
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(CupertinoIcons.doc_richtext, size: 64, color: Pal.blue),
+                                          const SizedBox(height: 10),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            child: Text(
+                                              widget.file.uri.pathSegments.last,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : Image.file(
+                                      widget.file,
+                                      fit: BoxFit.cover,
+                                      width: 240,
+                                      height: 280,
+                                    ),
+                            ),
+
+                            // Viewfinder HUD Corner brackets
+                            if (!failed)
+                              const Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CustomPaint(
+                                      painter: _HudViewfinderPainter(accentColor: Pal.blue),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // Animated Glowing Laser Scan Beam
+                            if (!failed)
+                              AnimatedBuilder(
+                                animation: _scanController,
+                                builder: (context, _) {
+                                  return Positioned(
+                                    top: _scanController.value * 276,
+                                    left: 0,
+                                    right: 0,
+                                    child: Container(
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Pal.blue.withValues(alpha: 0.0),
+                                            Pal.blue,
+                                            const Color(0xFF64D2FF),
+                                            Pal.blue,
+                                            Pal.blue.withValues(alpha: 0.0),
+                                          ],
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Pal.blue.withValues(alpha: 0.8),
+                                            blurRadius: 12,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 28),
+
+                // 2. Active AI Telemetry Card or Failure Fallback
+                if (!failed) ...[
+                  LiquidGlassCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Pal.blue.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(currentStep.icon, size: 18, color: Pal.blue),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: Text(
+                                      currentStep.title,
+                                      key: ValueKey(currentStep.title),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        letterSpacing: -0.2,
+                                        color: Pal.ink,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: Text(
+                                      currentStep.subtitle,
+                                      key: ValueKey(currentStep.subtitle),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Pal.muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Progress Step Dot Indicator
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(_telemetrySteps.length, (idx) {
+                            final active = idx == _stepIndex;
+                            final passed = idx < _stepIndex;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: active ? 24 : 7,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? Pal.blue
+                                    : (passed ? Pal.blue.withValues(alpha: 0.4) : Pal.line),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Failure state with clean recovery options
+                  LiquidGlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        const Icon(CupertinoIcons.exclamationmark_triangle_fill, size: 36, color: Pal.brick),
+                        const SizedBox(height: 12),
+                        Text(
+                          notBill ? 'Document Not Recognized' : 'Could Not Extract Details',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: Pal.ink),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          notBill
+                              ? 'This image doesn\'t appear to be a retail invoice or cash receipt.'
+                              : (error ?? 'Could not read document contents automatically.'),
+                          style: const TextStyle(fontSize: 13, color: Pal.muted, height: 1.4),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Pal.r)),
+                                ),
+                                child: const Text('Try Again'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: _manualEntry,
+                                style: FilledButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Pal.r)),
+                                ),
+                                child: const Text('Enter Manually'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const Spacer(),
+              ],
+            ),
+          ),
+        ),
       ),
-    ));
+    );
   }
+}
+
+class _HudViewfinderPainter extends CustomPainter {
+  final Color accentColor;
+  const _HudViewfinderPainter({required this.accentColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = accentColor.withValues(alpha: 0.85)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const arm = 18.0;
+
+    // Top-Left
+    canvas.drawLine(const Offset(0, arm), Offset.zero, paint);
+    canvas.drawLine(Offset.zero, const Offset(arm, 0), paint);
+
+    // Top-Right
+    canvas.drawLine(Offset(size.width - arm, 0), Offset(size.width, 0), paint);
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width, arm), paint);
+
+    // Bottom-Left
+    canvas.drawLine(const Offset(0, arm), Offset(0, size.height), paint);
+    canvas.drawLine(Offset(0, size.height), Offset(arm, size.height), paint);
+
+    // Bottom-Right
+    canvas.drawLine(Offset(size.width - arm, size.height), Offset(size.width, size.height), paint);
+    canvas.drawLine(Offset(size.width, size.height - arm), Offset(size.width, size.height), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Row {
@@ -721,6 +1046,76 @@ class _ReviewState extends State<ReviewScreen> {
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
   }
 
+  void _openInvoicePreview() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: LiquidGlassCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(CupertinoIcons.doc_text_viewfinder, size: 18, color: Pal.blue),
+                      SizedBox(width: 8),
+                      Text(
+                        'Original Document',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Pal.ink),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.xmark_circle_fill, color: Pal.muted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(Pal.r),
+                child: SizedBox(
+                  height: MediaQuery.of(ctx).size.height * 0.65,
+                  width: double.infinity,
+                  child: isPdf(widget.file.path)
+                      ? Container(
+                          color: Pal.paper,
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(CupertinoIcons.doc_richtext, size: 64, color: Pal.blue),
+                              const SizedBox(height: 12),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Text(
+                                  widget.file.uri.pathSegments.last,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : InteractiveViewer(
+                          minScale: 0.8,
+                          maxScale: 5.0,
+                          child: Image.file(widget.file, fit: BoxFit.contain),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -728,20 +1123,45 @@ class _ReviewState extends State<ReviewScreen> {
       decoration: glassBackdrop,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Review'), backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0),
+        appBar: AppBar(
+          title: const Text('Review & Confirm'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(CupertinoIcons.doc_text_viewfinder, color: Pal.blue),
+              tooltip: 'Inspect original bill',
+              onPressed: _openInvoicePreview,
+            ),
+          ],
+        ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: FilledButton(
               onPressed: canSave ? _save : null,
               child: Text(saving
-                  ? 'Saving'
+                  ? 'Saving to Vault...'
                   : (rows.any((r) => r.track && r.isSearchingWarranty)
                       ? 'AI searching warranty...'
                       : 'Save and start countdown'))),
         ),
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 24), children: [
+        // 1. Interactive Original Invoice Inspector Card
+        _InvoiceDocumentPeek(
+          file: widget.file,
+          onInspect: _openInvoicePreview,
+        ),
+
+        // 2. Interactive Live Countdown Simulator Hero
+        _LiveCountdownHero(
+          purchaseDate: date,
+          rows: rows,
+          store: widget.store,
+        ),
+
         Text('Check what we found', style: t.headlineSmall),
         const SizedBox(height: 4),
         Text('Fields marked amber were hard to read. Edit anything before saving.',
@@ -1185,12 +1605,71 @@ class _ItemCardState extends State<_ItemCard> {
           // 4. Empty Terms Prompt
           if (!r.isSearchingWarranty && r.terms.isEmpty)
             const Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.only(bottom: 10),
               child: Text(
-                'No preset warranty applied. Tap "AI Search Warranty" to discover official manufacturer coverage, or add terms manually.',
+                'No preset warranty applied. Tap "AI Search Warranty" to discover official manufacturer coverage, or select a duration below.',
                 style: TextStyle(fontSize: 12, color: Pal.muted, height: 1.3),
               ),
             ),
+
+          // Quick Interactive Duration Presets
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  const Text('Quick set:', style: TextStyle(fontSize: 11, color: Pal.muted, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
+                  for (final preset in const [
+                    (label: '6 Mos', months: 6),
+                    (label: '1 Year', months: 12),
+                    (label: '2 Years', months: 24),
+                    (label: '3 Years', months: 36),
+                    (label: '5 Years', months: 60),
+                  ]) ...[
+                    AppleBounce(
+                      onTap: () {
+                        if (r.terms.isEmpty) {
+                          r.terms.add(Term('Product', preset.months, TermSource.manual));
+                        } else {
+                          r.terms.first.months = preset.months;
+                        }
+                        _changed();
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: (r.terms.isNotEmpty && r.terms.first.months == preset.months)
+                              ? Pal.blue.withValues(alpha: 0.15)
+                              : Colors.black.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (r.terms.isNotEmpty && r.terms.first.months == preset.months)
+                                ? Pal.blue.withValues(alpha: 0.4)
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: Text(
+                          preset.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: (r.terms.isNotEmpty && r.terms.first.months == preset.months)
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: (r.terms.isNotEmpty && r.terms.first.months == preset.months)
+                                ? Pal.blue
+                                : Pal.ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
 
           // 5. Existing Terms list
           for (final term in r.terms)
@@ -1327,4 +1806,261 @@ class SourceChip extends StatelessWidget {
           style: TextStyle(fontSize: 12, color: est ? Pal.amber : Pal.green)),
     );
   }
+}
+
+class _InvoiceDocumentPeek extends StatelessWidget {
+  final File file;
+  final VoidCallback onInspect;
+
+  const _InvoiceDocumentPeek({
+    required this.file,
+    required this.onInspect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pdf = isPdf(file.path);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: LiquidGlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: pdf
+                  ? Container(
+                      color: Pal.blue.withValues(alpha: 0.12),
+                      alignment: Alignment.center,
+                      child: const Icon(CupertinoIcons.doc_richtext, size: 24, color: Pal.blue),
+                    )
+                  : Image.file(file, fit: BoxFit.cover),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(CupertinoIcons.doc_checkmark_fill, size: 13, color: Pal.green),
+                    const SizedBox(width: 4),
+                    Text(
+                      pdf ? 'PDF INVOICE ATTACHED' : 'RECEIPT PHOTO ATTACHED',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: Pal.muted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  file.uri.pathSegments.last,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pal.ink),
+                ),
+              ],
+            ),
+          ),
+          AppleBounce(
+            onTap: onInspect,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Pal.blue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(CupertinoIcons.viewfinder, size: 14, color: Pal.blue),
+                  SizedBox(width: 4),
+                  Text(
+                    'Inspect',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Pal.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+}
+
+class _LiveCountdownHero extends StatelessWidget {
+  final DateTime? purchaseDate;
+  final List<_Row> rows;
+  final Store store;
+
+  const _LiveCountdownHero({
+    required this.purchaseDate,
+    required this.rows,
+    required this.store,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final start = purchaseDate ?? DateTime.now();
+    final trackedRows = rows.where((r) => r.track && r.terms.isNotEmpty).toList();
+
+    int maxMonths = 0;
+    for (final r in trackedRows) {
+      for (final t in r.terms) {
+        if (t.months > maxMonths) maxMonths = t.months;
+      }
+    }
+
+    final hasWarranty = maxMonths > 0;
+    final endDate = hasWarranty ? addMonths(start, maxMonths) : start;
+    final now = DateTime.now();
+    final daysLeft = hasWarranty ? endDate.difference(now).inDays : 0;
+
+    final Color badgeColor;
+    final String statusLabel;
+    final IconData statusIcon;
+
+    if (!hasWarranty) {
+      badgeColor = Pal.muted;
+      statusLabel = 'Pending Warranty Terms';
+      statusIcon = CupertinoIcons.clock;
+    } else if (daysLeft > 30) {
+      badgeColor = Pal.green;
+      statusLabel = 'Active Coverage';
+      statusIcon = CupertinoIcons.checkmark_shield_fill;
+    } else if (daysLeft >= 0) {
+      badgeColor = Pal.amber;
+      statusLabel = 'Expiring Soon';
+      statusIcon = CupertinoIcons.exclamationmark_shield_fill;
+    } else {
+      badgeColor = Pal.brick;
+      statusLabel = 'Expired';
+      statusIcon = CupertinoIcons.xmark_shield_fill;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: LiquidGlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(statusIcon, color: badgeColor, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'LIVE COUNTDOWN SIMULATOR',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: Pal.muted,
+                        ),
+                      ),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: badgeColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (hasWarranty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Pal.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$maxMonths Mos Coverage',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Pal.blue,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                hasWarranty ? '${daysLeft > 0 ? daysLeft : 0}' : '--',
+                style: const TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1.0,
+                  height: 1.0,
+                  color: Pal.ink,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                hasWarranty
+                    ? (daysLeft == 1 ? 'day remaining' : 'days remaining')
+                    : 'days remaining (set warranty terms below)',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Pal.muted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Purchased: ${store.formatDate(start)}',
+                style: const TextStyle(fontSize: 11, color: Pal.muted),
+              ),
+              Text(
+                hasWarranty ? 'Valid until: ${store.formatDate(endDate)}' : 'No expiry set',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Pal.ink),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
 }
