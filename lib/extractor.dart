@@ -7,8 +7,6 @@ import 'package:http/http.dart' as http;
 /// ponytail: key ships in the client for MVP. Move the call behind a
 /// Cloud Function before any public release.
 const _key = String.fromEnvironment('GEMINI_API_KEY');
-const _model = 'gemini-2.0-flash';
-const _fallbackModel = 'gemini-1.5-flash';
 
 class NotABill implements Exception {}
 
@@ -196,7 +194,7 @@ class DefaultBillExtractor implements BillExtractor {
 
     // Build model list: cached first, followed by standard fallback candidates
     final candidateModels = <String>{
-      if (_cachedWorkingModel != null) _cachedWorkingModel!,
+      ?_cachedWorkingModel,
       'gemini-2.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-flash',

@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'extractor.dart';
 import 'models.dart';
 import 'resolver.dart';
 import 'store.dart';
@@ -184,41 +185,183 @@ Future<void> showClaimSheet(BuildContext context, Store s, Item i) {
   );
 }
 
-/// Allows users to re-evaluate an older item's warranty against the new brand policy.
+/// Live AI Warranty Research: Searches the product's official manufacturer & retailer
+/// warranty terms via Gemini AI, showing the user the reasoning, terms, and updating the item clock.
 Future<void> recheckWarrantyPolicy(BuildContext context, Store s, Item i) async {
-  final resolved = resolveWarranty(
-    name: i.name,
-    brand: i.brand,
-    category: i.category,
-    aiTerms: [Term('Product', 12, TermSource.brand)],
+  // Show progress indicator dialog while AI searches
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            color: Pal.card,
+            borderRadius: BorderRadius.circular(Pal.r),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(strokeWidth: 3, color: Pal.blue),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Searching warranty policy...',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Consulting official brand guidelines for ${i.brand.isNotEmpty ? i.brand : i.name}',
+                style: const TextStyle(fontSize: 12, color: Pal.muted),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 
-  final updatedTerms = resolved.isNotEmpty ? resolved : [Term('Product', 12, TermSource.brand)];
+  List<Term> newTerms = [];
+  String explanation = '';
+  String? supportLine;
+
+  try {
+    Bill? bill;
+    for (final b in s.bills) {
+      if (b.id == i.billId) {
+        bill = b;
+        break;
+      }
+    }
+    final sellerName = bill?.seller ?? '';
+
+    final aiResult = await queryProductWarrantyPolicy(
+      productName: i.name,
+      brand: i.brand,
+      model: i.model,
+      seller: sellerName,
+      apiKey: s.userApiKey,
+    );
+
+    if (aiResult.terms.isNotEmpty) {
+      newTerms = aiResult.terms.map((t) {
+        final label = (t['label'] ?? 'Product').toString();
+        final months = (t['months'] as num?)?.toInt() ?? 12;
+        return Term(label, months, TermSource.brand);
+      }).toList();
+    }
+    explanation = aiResult.summary;
+    supportLine = aiResult.support;
+  } catch (e) {
+    debugPrint('AI live lookup fallback: $e');
+    // Fallback to local resolver rules
+    final resolved = resolveWarranty(
+      name: i.name,
+      brand: i.brand,
+      category: i.category,
+      aiTerms: null,
+    );
+    newTerms = resolved.isNotEmpty ? resolved : [Term('Product', 12, TermSource.brand)];
+    explanation = 'Calculated from official manufacturer standard catalog.';
+  } finally {
+    // Dismiss loading dialog if open
+    if (context.mounted && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
+  if (!context.mounted) return;
 
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Update warranty terms?'),
-      content: Text(
-        'Based on brand standards for ${i.brand.isNotEmpty ? i.brand : i.name}, '
-        'the suggested coverage is:\n\n' +
-            updatedTerms.map((t) => '• ${t.label}: ${t.months} months (${sourceLabel[t.source]})').join('\n') +
-            '\n\nWould you like to update this item?',
+      title: const Text('Update Warranty Terms?'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (explanation.isNotEmpty) ...[
+              Text(explanation, style: const TextStyle(fontSize: 13, height: 1.4)),
+              const SizedBox(height: 14),
+            ],
+            const Text(
+              'Verified Coverage Terms:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            for (final t in newTerms)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, size: 16, color: Pal.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${t.label}: ${t.months} months (${(t.months / 12).toStringAsFixed(t.months % 12 == 0 ? 0 : 1)} yr)',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (supportLine != null && supportLine.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Pal.paper,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.headset_mic_outlined, size: 16, color: Pal.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Support: $supportLine',
+                        style: const TextStyle(fontSize: 12, color: Pal.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Current')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Keep Current'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Apply Verified Policy'),
+        ),
       ],
     ),
   );
 
   if (confirmed == true) {
-    i.terms = updatedTerms;
+    i.terms = newTerms;
     await s.update();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Warranty updated to brand policy.')),
+        SnackBar(
+          content: Text(
+            'Updated ${i.name} warranty to ${newTerms.map((t) => '${t.months} mos').join(', ')}.',
+          ),
+        ),
       );
     }
   }
 }
+

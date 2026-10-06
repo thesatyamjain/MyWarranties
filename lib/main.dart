@@ -911,7 +911,7 @@ class Detail extends StatelessWidget {
                     style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
                     onPressed: () => recheckWarrantyPolicy(context, s, i),
                     icon: const Icon(CupertinoIcons.sparkles, size: 14),
-                    label: const Text('Sync with Brand Policy')),
+                    label: const Text('AI Search Warranty')),
               ],
             ),
           ]),
@@ -1286,65 +1286,7 @@ class SettingsScreen extends StatelessWidget {
           ]),
         ),
       ),
-      const SizedBox(height: 28),
-      Text('Date Display Format', style: t.titleSmall),
-      const SizedBox(height: 4),
-      Text('Choose how purchase and expiry dates are formatted across the app.',
-          style: t.bodySmall),
-      const SizedBox(height: 12),
-      Glass(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        child: Column(
-          children: [
-            for (final entry in indianDateFormats.entries) ...[
-              InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => s.setDateFormat(entry.key),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              entry.value,
-                              style: TextStyle(
-                                fontWeight: s.dateFormatPattern == entry.key
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                fontSize: 14,
-                                color: s.dateFormatPattern == entry.key ? Pal.ink : Pal.ink.withValues(alpha: 0.8),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Example: ${s.formatWith(DateTime.now(), entry.key)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: s.dateFormatPattern == entry.key ? Pal.blue : Pal.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (s.dateFormatPattern == entry.key)
-                        const Icon(CupertinoIcons.checkmark_alt_circle_fill,
-                            color: Pal.blue, size: 20)
-                      else
-                        Icon(CupertinoIcons.circle,
-                            color: Pal.muted.withValues(alpha: 0.4), size: 20),
-                    ],
-                  ),
-                ),
-              ),
-              if (entry.key != indianDateFormats.keys.last)
-                const Divider(height: 1, color: Color(0x12000000)),
-            ],
-          ],
-        ),
-      ),
+
       const SizedBox(height: 28),
       Text('Google Drive Cloud Sync', style: t.titleSmall),
       const SizedBox(height: 4),

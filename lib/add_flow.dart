@@ -752,13 +752,13 @@ class _DateField extends StatelessWidget {
             if (d != null) onPick(d);
           },
           child: InputDecorator(
-            decoration: lowDecoration('Purchase date (${store.dateFormatPattern.toUpperCase()})', conf < 0.8)
+            decoration: lowDecoration('Purchase date (e.g. 6 Oct 2026)', conf < 0.8)
                 .copyWith(errorText: issue),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  date == null ? 'Select date (${store.dateFormatPattern.toUpperCase()})' : store.formatDate(date!),
+                  date == null ? 'Select purchase date' : store.formatDate(date!),
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: date != null ? FontWeight.w600 : FontWeight.w400,
