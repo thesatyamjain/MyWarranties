@@ -9,7 +9,7 @@ import 'store.dart';
 
 /// Bridges Flutter state to the native Android AppWidget without heavy plugins.
 class WidgetBridge {
-  static const _channel = MethodChannel('com.satyam.my_warranties/widget');
+  static const _channel = MethodChannel('com.thesoftwareco.warranties/widget');
   static Future<void> sync(Store store) async {
     if (kIsWeb || !Platform.isAndroid) return;
     try {
