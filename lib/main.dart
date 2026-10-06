@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoSwitch;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -1830,9 +1830,83 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
                 ),
             ],
           ),
-          if (user != null) ...[
-            const SizedBox(height: 16),
+          if (user == null) ...[
+            const SizedBox(height: 14),
             const Divider(height: 1, color: Color(0x15000000)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Auto Sync',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Connect Google account to enable auto backup',
+                        style: TextStyle(color: Pal.muted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: CupertinoSwitch(
+                    activeTrackColor: Pal.blue,
+                    value: false,
+                    onChanged: _busy ? null : (_) => _handleSignIn(),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (user != null) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: Color(0x15000000)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Auto Sync',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DriveSyncService.lastSyncTime != null
+                            ? 'Last synced: ${widget.store.formatDate(DriveSyncService.lastSyncTime!)}'
+                            : 'Back up automatically when bills change',
+                        style: const TextStyle(color: Pal.muted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: CupertinoSwitch(
+                    activeTrackColor: Pal.blue,
+                    value: DriveSyncService.isAutoSyncEnabled,
+                    onChanged: _busy
+                        ? null
+                        : (val) async {
+                            await DriveSyncService.setAutoSyncEnabled(val);
+                            if (val) {
+                              DriveSyncService.autoBackup(widget.store);
+                            }
+                            if (mounted) setState(() {});
+                          },
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
             Row(
               children: [

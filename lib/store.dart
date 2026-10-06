@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'drive_sync.dart';
 import 'models.dart';
 import 'widget_bridge.dart';
 
@@ -41,6 +42,7 @@ class Store extends ChangeNotifier {
     if (!kIsWeb) {
       _initNotifications();
     }
+    await DriveSyncService.initPrefs();
     WidgetBridge.sync(this);
   }
 
@@ -135,6 +137,9 @@ class Store extends ChangeNotifier {
     await _reschedule();
     await WidgetBridge.sync(this);
     notifyListeners();
+    if (DriveSyncService.isAutoSyncEnabled) {
+      DriveSyncService.autoBackup(this);
+    }
   }
 
   /// Cancel-all then re-create: simple and correct for a few hundred reminders.

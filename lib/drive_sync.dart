@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
 import 'store.dart';
@@ -27,7 +28,46 @@ class DriveSyncService {
   static const String serverClientId =
       '739225721782-hq8d17q5c3lm2pcqchs2g73m8ejie83j.apps.googleusercontent.com';
 
+  static const _prefAutoSync = 'drive_auto_sync_enabled';
+  static const _prefSignedInEmail = 'drive_signed_in_email';
+  static const _prefLastSync = 'drive_last_sync_timestamp';
+
+  static bool _autoSyncEnabled = false;
+  static DateTime? _lastSyncTime;
+  static bool _isSyncing = false;
+
   static GoogleSignInAccount? get currentUser => _currentUser;
+  static bool get isAutoSyncEnabled => _autoSyncEnabled;
+  static DateTime? get lastSyncTime => _lastSyncTime;
+  static bool get isSyncing => _isSyncing;
+
+  /// Load persisted auto-sync settings and restore session silently if auto-sync was active
+  static Future<void> initPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _autoSyncEnabled = prefs.getBool(_prefAutoSync) ?? false;
+      final lastMs = prefs.getInt(_prefLastSync);
+      if (lastMs != null) {
+        _lastSyncTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      }
+      final savedEmail = prefs.getString(_prefSignedInEmail);
+      if (savedEmail != null && _autoSyncEnabled) {
+        await signInSilently();
+      }
+    } catch (e) {
+      debugPrint('DriveSync initPrefs error: $e');
+    }
+  }
+
+  static Future<void> setAutoSyncEnabled(bool enabled) async {
+    _autoSyncEnabled = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefAutoSync, enabled);
+    } catch (e) {
+      debugPrint('Error saving auto-sync pref: $e');
+    }
+  }
 
   static Future<void> _ensureInit() async {
     if (_initialized) return;
@@ -62,6 +102,15 @@ class DriveSyncService {
     try {
       final acc = await _google.authenticate(scopeHint: _scopes);
       _currentUser = acc;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefSignedInEmail, acc.email);
+        // Default auto-sync to true if user hasn't toggled it yet
+        if (prefs.getBool(_prefAutoSync) == null) {
+          _autoSyncEnabled = true;
+          await prefs.setBool(_prefAutoSync, true);
+        }
+      } catch (_) {}
       return acc;
     } catch (e) {
       debugPrint('Google Sign-In error: $e');
@@ -75,17 +124,25 @@ class DriveSyncService {
     try {
       await _google.signOut();
       _currentUser = null;
+      _autoSyncEnabled = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefSignedInEmail);
+        await prefs.setBool(_prefAutoSync, false);
+      } catch (_) {}
     } catch (e) {
       debugPrint('Google Sign-Out error: $e');
     }
   }
 
   /// Get authenticated Drive API client
-  static Future<drive.DriveApi?> _getDriveApi() async {
+  static Future<drive.DriveApi?> _getDriveApi({bool allowInteractive = true}) async {
     await _ensureInit();
     var account = _currentUser;
     account ??= await signInSilently();
-    account ??= await signIn();
+    if (account == null && allowInteractive) {
+      account = await signIn();
+    }
     if (account == null) return null;
 
     final authz = await account.authorizationClient.authorizeScopes(_scopes);
@@ -109,9 +166,9 @@ class DriveSyncService {
   }
 
   /// Backup all bills and items to Google Drive
-  static Future<({bool ok, String message, int count})> backup(Store store) async {
+  static Future<({bool ok, String message, int count})> backup(Store store, {bool allowInteractive = true}) async {
     try {
-      final api = await _getDriveApi();
+      final api = await _getDriveApi(allowInteractive: allowInteractive);
       if (api == null) {
         return (ok: false, message: 'Google Sign-In required.', count: 0);
       }
@@ -175,6 +232,12 @@ class DriveSyncService {
         uploadedFiles++;
       }
 
+      _lastSyncTime = DateTime.now();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_prefLastSync, _lastSyncTime!.millisecondsSinceEpoch);
+      } catch (_) {}
+
       return (
         ok: true,
         message: 'Successfully backed up ${store.items.length} items to Google Drive.',
@@ -188,8 +251,9 @@ class DriveSyncService {
 
   /// Restore bills and items from Google Drive
   static Future<({bool ok, String message, int count})> restore(Store store) async {
+    _isSyncing = true;
     try {
-      final api = await _getDriveApi();
+      final api = await _getDriveApi(allowInteractive: true);
       if (api == null) {
         return (ok: false, message: 'Google Sign-In required.', count: 0);
       }
@@ -266,6 +330,12 @@ class DriveSyncService {
 
       await store.update();
 
+      _lastSyncTime = DateTime.now();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_prefLastSync, _lastSyncTime!.millisecondsSinceEpoch);
+      } catch (_) {}
+
       return (
         ok: true,
         message: 'Successfully restored $restoredCount item(s) from Google Drive.',
@@ -274,6 +344,26 @@ class DriveSyncService {
     } catch (e) {
       debugPrint('Drive restore error: $e');
       return (ok: false, message: _formatDriveError(e, 'Restore'), count: 0);
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  /// Background auto-sync triggered on warranty additions/edits/deletions.
+  static Future<void> autoBackup(Store store) async {
+    if (!_autoSyncEnabled || _isSyncing) return;
+    _isSyncing = true;
+    try {
+      final res = await backup(store, allowInteractive: false);
+      if (res.ok) {
+        debugPrint('Auto-sync: successfully backed up to Google Drive');
+      } else {
+        debugPrint('Auto-sync skipped: ${res.message}');
+      }
+    } catch (e) {
+      debugPrint('Auto-sync error: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 

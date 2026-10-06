@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:my_warranties/drive_sync.dart';
 import 'package:my_warranties/models.dart';
 import 'package:my_warranties/resolver.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('month math clamps to month end', () {
@@ -36,5 +38,14 @@ void main() {
   test('products without explicit terms start empty for AI search, not hardcoded presets', () {
     final terms = resolveWarranty(name: 'Custom Product', brand: 'Generic', category: 'Other');
     expect(terms, isEmpty);
+  });
+
+  test('drive auto sync pref toggling and state', () async {
+    SharedPreferences.setMockInitialValues({'drive_auto_sync_enabled': true});
+    await DriveSyncService.initPrefs();
+    expect(DriveSyncService.isAutoSyncEnabled, isTrue);
+
+    await DriveSyncService.setAutoSyncEnabled(false);
+    expect(DriveSyncService.isAutoSyncEnabled, isFalse);
   });
 }
