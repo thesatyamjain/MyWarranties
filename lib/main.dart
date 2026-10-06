@@ -1685,14 +1685,6 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
   String? _statusMessage;
   bool? _statusOk;
 
-  @override
-  void initState() {
-    super.initState();
-    DriveSyncService.signInSilently().then((_) {
-      if (mounted) setState(() {});
-    });
-  }
-
   Future<void> _handleSignIn() async {
     setState(() => _busy = true);
     try {
