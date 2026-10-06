@@ -744,7 +744,7 @@ class _DateField extends StatelessWidget {
           child: InputDecorator(
             decoration: lowDecoration('Purchase date (warranty starts here)', conf < 0.8)
                 .copyWith(errorText: issue),
-            child: Text(date == null ? 'Select date' : DateFormat('d MMM yyyy').format(date!)),
+            child: Text(date == null ? 'Select date' : DateFormat('dd/MM/yy').format(date!)),
           ),
         ),
       );

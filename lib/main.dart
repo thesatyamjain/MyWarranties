@@ -57,7 +57,7 @@ class App extends StatelessWidget {
       );
 }
 
-final _date = DateFormat('d MMM yyyy');
+final _date = DateFormat('dd/MM/yy');
 
 // ---------- 1. Onboarding ----------
 class Onboarding extends StatelessWidget {
