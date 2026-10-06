@@ -19,7 +19,7 @@ Designed with an Apple-inspired glass interface, tactile spring interactions, an
 - **Personal Google Drive Cloud Sync**: 1-tap backup and restore directly into your personal Google Drive (`My Warranties Vault` folder). Your bills never touch any third-party database.
 - **Android Auto-Backup Ready**: Native integration with Android Cloud Backup rules (`android:allowBackup="true"`) to survive accidental app uninstalls.
 - **Home Screen AppWidget**: Native Android home widget bridging warranty status and upcoming expirations directly to your home screen.
-- **Indian Date Formats**: First-class support for Indian date conventions (`DD/MM/YY`, `DD/MM/YYYY`, `DD-MM-YYYY`, `D MMM YYYY`, `DD MMMM YYYY`, `YYYY-MM-DD`) customizable from Settings.
+- **Automatic Indian Date Formatting**: Built-in standard `DD/MM/YY` formatting across all cards, count-down metrics, and detail views without needing manual configuration.
 - **Complete Claim & Support Suite**:
   - Direct customer care search for major consumer brands.
   - One-tap share of original invoice PDFs with authorized service centers.

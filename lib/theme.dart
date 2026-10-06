@@ -1,6 +1,5 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -24,8 +23,25 @@ class Pal {
 }
 
 final cardDecoration = BoxDecoration(
-  color: Pal.card,
+  color: Colors.white.withValues(alpha: 0.78),
   borderRadius: BorderRadius.circular(Pal.r),
+  border: Border.all(
+    color: Colors.white.withValues(alpha: 0.90),
+    width: 1.2,
+  ),
+  boxShadow: [
+    BoxShadow(
+      color: const Color(0xFF1E293B).withValues(alpha: 0.05),
+      blurRadius: 18,
+      spreadRadius: -2,
+      offset: const Offset(0, 6),
+    ),
+    BoxShadow(
+      color: Colors.white.withValues(alpha: 0.8),
+      blurRadius: 6,
+      offset: const Offset(0, -1),
+    ),
+  ],
 );
 
 ThemeData buildTheme() {
@@ -204,13 +220,85 @@ class Glass extends StatelessWidget {
   }
 }
 
-/// Soft tinted canvas so the glass has something to refract.
+/// Specialized Apple Liquid Glass card for list items and content containers
+class LiquidGlassCard extends StatelessWidget {
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  const LiquidGlassCard({
+    super.key,
+    required this.child,
+    this.radius = Pal.r,
+    this.padding = const EdgeInsets.all(16),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final r = BorderRadius.circular(radius);
+    Widget content = Container(
+      decoration: BoxDecoration(
+        borderRadius: r,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 16,
+            spreadRadius: -2,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: r,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              borderRadius: r,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.85),
+                  Colors.white.withValues(alpha: 0.65),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.90),
+                width: 1.2,
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+
+    if (onTap != null) {
+      return AppleBounce(
+        scaleFactor: 0.97,
+        onTap: onTap,
+        child: content,
+      );
+    }
+    return content;
+  }
+}
+
+/// Soft tinted canvas so the glass has something luminous to refract.
 const glassBackdrop = BoxDecoration(
   gradient: LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE3EDFF), Color(0xFFF2F2F7), Color(0xFFFBE9EF)],
-    stops: [0, 0.55, 1],
+    colors: [
+      Color(0xFFDCEBFF), // Apple Soft Ice Blue
+      Color(0xFFF3F3F8), // Neutral Refraction center
+      Color(0xFFFCE7EE), // Apple Subtle Quartz Pink
+    ],
+    stops: [0.0, 0.50, 1.0],
   ),
 );
 

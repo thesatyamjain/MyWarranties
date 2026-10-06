@@ -20,14 +20,12 @@ class Store extends ChangeNotifier {
   List<int> offsets = [30, 7, 0];
   bool onboarded = false;
   String userApiKey = '';
-
-  /// Unambiguous date format (e.g. "6 Oct 2026") eliminates day/month confusion (US vs UK).
-  static const standardDateFormat = 'd MMM yyyy';
   late SharedPreferences _p;
   final _n = FlutterLocalNotificationsPlugin();
 
-  String formatDate(DateTime d) => DateFormat(standardDateFormat).format(d);
-  String formatWith(DateTime d, String pattern) => DateFormat(pattern).format(d);
+  /// Automatically formats dates according to standard DD/MM/YY convention
+  String formatDate(DateTime d) => DateFormat('dd/MM/yy').format(d);
+
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
