@@ -898,8 +898,37 @@ class Detail extends StatelessWidget {
                 ]),
               ),
             const SizedBox(height: 6),
-            Text('Starts ${s.formatDate(i.start)} (${i.basis.toLowerCase()}). Terms and conditions may apply.',
-                style: t.bodySmall),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Starts ${s.formatDate(i.start)} (${i.basis.toLowerCase()}). ',
+                    style: t.bodySmall),
+                InkWell(
+                  onTap: () => openWarrantyTerms(i),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Terms & conditions',
+                          style: t.bodySmall?.copyWith(
+                            color: Pal.blue,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                            decorationColor: Pal.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(CupertinoIcons.arrow_up_right, size: 11, color: Pal.blue),
+                      ],
+                    ),
+                  ),
+                ),
+                Text(' may apply.', style: t.bodySmall),
+              ],
+            ),
             Row(
               children: [
                 TextButton(
@@ -942,6 +971,12 @@ class Detail extends StatelessWidget {
                 title: const Text('Find brand support'),
                 subtitle: Text('Customer care for ${i.brand.isEmpty ? 'this product' : i.brand}'),
                 onTap: () => openSupport(i)),
+            ListTile(
+                leading: const Icon(CupertinoIcons.doc_text, color: Pal.blue),
+                title: const Text('Terms & conditions'),
+                subtitle: Text('View official warranty rules for ${i.brand.isEmpty ? i.name : i.brand}'),
+                trailing: const Icon(CupertinoIcons.arrow_up_right, size: 14, color: Pal.muted),
+                onTap: () => openWarrantyTerms(i)),
             ListTile(
                 leading: const Icon(CupertinoIcons.calendar_badge_plus, color: Pal.blue),
                 title: const Text('Add expiry to calendar'),
@@ -1476,41 +1511,131 @@ class BuiltByFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: AppleBounce(
-        onTap: _launch,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Built by ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Pal.muted.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w400,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            InkWell(
+              onTap: () => _showTermsDialog(context),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  'Terms & Conditions',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Pal.muted,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
-              const Text(
-                'The Software Co.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Pal.blue,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.underline,
-                  decorationColor: Pal.blue,
+            ),
+            const Text('·', style: TextStyle(color: Pal.muted, fontSize: 14)),
+            InkWell(
+              onTap: () => _showPrivacyDialog(context),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  'Privacy Policy',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Pal.muted,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(
-                CupertinoIcons.arrow_up_right,
-                size: 11,
-                color: Pal.blue.withValues(alpha: 0.9),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: AppleBounce(
+            onTap: _launch,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Built by ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Pal.muted.withValues(alpha: 0.8),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const Text(
+                    'The Software Co.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Pal.blue,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                      decorationColor: Pal.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    CupertinoIcons.arrow_up_right,
+                    size: 11,
+                    color: Pal.blue.withValues(alpha: 0.9),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
+      ],
+    );
+  }
+
+  static void _showTermsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Terms & Conditions'),
+        content: const SingleChildScrollView(
+          child: Text(
+            '1. Personal Utility:\nMy Warranties is designed to assist you in tracking purchase receipts, bills, and manufacturer warranty periods. All product warranties are granted and governed exclusively by their respective original manufacturers or retailers.\n\n'
+            '2. Information Accuracy:\nWarranty dates, policies, and AI extractions are offered as organizational estimates. Users are advised to preserve their original purchase invoices for formal warranty claims.\n\n'
+            '3. Data Privacy & Storage:\nAll receipts and documents reside locally on your device or in your personal Google Drive / Android Auto-Backup. No document is uploaded to third-party commercial databases.',
+            style: TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showPrivacyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Privacy Policy'),
+        content: const SingleChildScrollView(
+          child: Text(
+            '1. Zero Telemetry & Privacy First:\nMy Warranties does not track, collect, sell, or rent your personal data, invoices, or device details.\n\n'
+            '2. Storage & Cloud Sync:\nBills, warranty details, and PDFs are stored locally in your device storage. When Google Drive Sync is enabled, files are transferred directly to your own Google Drive.\n\n'
+            '3. AI Bill Scanning:\nWhen scanning receipts with Gemini AI, bill images are processed strictly to extract warranty details.',
+            style: TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

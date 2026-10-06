@@ -91,6 +91,12 @@ Future<void> openSupport(Item i) => launchUrl(
         {'q': '${i.brand.isEmpty ? i.name : i.brand} customer care contact number'}),
     mode: LaunchMode.externalApplication);
 
+/// Open official warranty terms and conditions for the specific product or brand.
+Future<void> openWarrantyTerms(Item i) => launchUrl(
+    Uri.https('www.google.com', '/search',
+        {'q': '${i.brand.isNotEmpty ? i.brand : ""} ${i.name} warranty policy terms and conditions'}),
+    mode: LaunchMode.externalApplication);
+
 const _bases = ['Purchase date', 'Delivery date', 'Installation date'];
 
 /// FR-14: pick which date starts the clock, and the date itself.

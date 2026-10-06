@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import 'extractor.dart';
@@ -677,7 +678,43 @@ class _ReviewState extends State<ReviewScreen> {
         for (final r in rows) _ItemCard(r, onChanged: () => setState(() {})),
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text('Terms and conditions may apply to every warranty.', style: t.bodySmall),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              InkWell(
+                onTap: () {
+                  final query = rows.isNotEmpty && rows.first.brand.text.trim().isNotEmpty
+                      ? '${rows.first.brand.text.trim()} warranty terms and conditions'
+                      : 'standard manufacturer warranty terms and conditions India';
+                  launchUrl(
+                    Uri.https('www.google.com', '/search', {'q': query}),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Terms & conditions',
+                        style: t.bodySmall?.copyWith(
+                          color: Pal.blue,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Pal.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      const Icon(CupertinoIcons.arrow_up_right, size: 11, color: Pal.blue),
+                    ],
+                  ),
+                ),
+              ),
+              Text(' may apply to every warranty.', style: t.bodySmall),
+            ],
+          ),
         ),
       ]),
     );
