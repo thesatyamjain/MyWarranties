@@ -24,23 +24,30 @@ class Pal {
 }
 
 final cardDecoration = BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.78),
-  borderRadius: BorderRadius.circular(Pal.r),
+  gradient: LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Colors.white.withValues(alpha: 0.82),
+      Colors.white.withValues(alpha: 0.52),
+    ],
+  ),
+  borderRadius: BorderRadius.circular(16),
   border: Border.all(
     color: Colors.white.withValues(alpha: 0.90),
     width: 1.2,
   ),
   boxShadow: [
     BoxShadow(
-      color: const Color(0xFF1E293B).withValues(alpha: 0.05),
-      blurRadius: 18,
+      color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+      blurRadius: 20,
       spreadRadius: -2,
-      offset: const Offset(0, 6),
+      offset: const Offset(0, 8),
     ),
     BoxShadow(
-      color: Colors.white.withValues(alpha: 0.8),
+      color: const Color(0xFF000000).withValues(alpha: 0.02),
       blurRadius: 6,
-      offset: const Offset(0, -1),
+      offset: const Offset(0, 2),
     ),
   ],
 );
@@ -155,6 +162,9 @@ class Glass extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final double blur;
   final bool showShadow;
+  final Gradient? gradient;
+  final BoxBorder? border;
+  final List<BoxShadow>? boxShadow;
 
   const Glass({
     super.key,
@@ -163,6 +173,9 @@ class Glass extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.blur = 28.0,
     this.showShadow = true,
+    this.gradient,
+    this.border,
+    this.boxShadow,
   });
 
   @override
@@ -171,23 +184,24 @@ class Glass extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: r,
-        boxShadow: showShadow
-            ? [
-                // Soft ambient floor shadow
-                BoxShadow(
-                  color: const Color(0xFF001133).withValues(alpha: 0.08),
-                  blurRadius: 36,
-                  spreadRadius: -4,
-                  offset: const Offset(0, 14),
-                ),
-                // Tight contact shadow for floating separation
-                BoxShadow(
-                  color: const Color(0xFF000000).withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
+        boxShadow: boxShadow ??
+            (showShadow
+                ? [
+                    // Soft ambient floor shadow
+                    BoxShadow(
+                      color: const Color(0xFF001133).withValues(alpha: 0.08),
+                      blurRadius: 36,
+                      spreadRadius: -4,
+                      offset: const Offset(0, 14),
+                    ),
+                    // Tight contact shadow for floating separation
+                    BoxShadow(
+                      color: const Color(0xFF000000).withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null),
       ),
       child: ClipRRect(
         borderRadius: r,
@@ -197,21 +211,22 @@ class Glass extends StatelessWidget {
             padding: padding,
             decoration: BoxDecoration(
               borderRadius: r,
-              // Translucent milky refractive surface
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.72),
-                  Colors.white.withValues(alpha: 0.38),
-                ],
-                stops: const [0.0, 1.0],
-              ),
-              // Dual-toned specular rim simulating light refraction across curved glass
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.85),
-                width: 1.2,
-              ),
+              // Translucent milky refractive surface with Apple directional light angle
+              gradient: gradient ??
+                  LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.72),
+                      Colors.white.withValues(alpha: 0.38),
+                    ],
+                    stops: const [0.0, 1.0],
+                  ),
+              border: border ??
+                  Border.all(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    width: 1.2,
+                  ),
             ),
             child: child,
           ),
@@ -231,7 +246,7 @@ class LiquidGlassCard extends StatelessWidget {
   const LiquidGlassCard({
     super.key,
     required this.child,
-    this.radius = Pal.r,
+    this.radius = 16,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
   });
@@ -243,18 +258,25 @@ class LiquidGlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: r,
         boxShadow: [
+          // Ambient soft floor shadow
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 16,
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 20,
             spreadRadius: -2,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 8),
+          ),
+          // Tight contact shadow for floating separation
+          BoxShadow(
+            color: const Color(0xFF000000).withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: r,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
@@ -263,12 +285,12 @@ class LiquidGlassCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withValues(alpha: 0.85),
-                  Colors.white.withValues(alpha: 0.65),
+                  Colors.white.withValues(alpha: 0.76),
+                  Colors.white.withValues(alpha: 0.44),
                 ],
               ),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.90),
+                color: Colors.white.withValues(alpha: 0.88),
                 width: 1.2,
               ),
             ),
@@ -295,11 +317,12 @@ const glassBackdrop = BoxDecoration(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFFDCEBFF), // Apple Soft Ice Blue
-      Color(0xFFF3F3F8), // Neutral Refraction center
-      Color(0xFFFCE7EE), // Apple Subtle Quartz Pink
+      Color(0xFFD6E6FE), // Apple Soft Ice Blue
+      Color(0xFFEBE7FB), // Soft Lavender/Iris glow
+      Color(0xFFF5F3FA), // Neutral Refraction center
+      Color(0xFFFDE7EE), // Apple Subtle Quartz Pink
     ],
-    stops: [0.0, 0.50, 1.0],
+    stops: [0.0, 0.32, 0.68, 1.0],
   ),
 );
 

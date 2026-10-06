@@ -481,8 +481,11 @@ class _ProcessingState extends State<ProcessingScreen> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final failed = error != null || notBill;
-    return Scaffold(
-      appBar: AppBar(),
+    return DecoratedBox(
+      decoration: glassBackdrop,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0),
       body: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -533,7 +536,7 @@ class _ProcessingState extends State<ProcessingScreen> {
           ],
         ]),
       ),
-    );
+    ));
   }
 }
 
@@ -721,8 +724,11 @@ class _ReviewState extends State<ReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Review')),
+    return DecoratedBox(
+      decoration: glassBackdrop,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: const Text('Review'), backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -819,7 +825,7 @@ class _ReviewState extends State<ReviewScreen> {
           ),
         ),
       ]),
-    );
+    ));
   }
 }
 
@@ -959,11 +965,12 @@ class _ItemCardState extends State<_ItemCard> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: cardDecoration,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: LiquidGlassCard(
+        radius: 16,
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           Checkbox(
             value: r.track,
@@ -1257,7 +1264,8 @@ class _ItemCardState extends State<_ItemCard> {
           ),
         ],
       ]),
-    );
+    ),
+  );
   }
 }
 

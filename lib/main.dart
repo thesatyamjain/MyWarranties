@@ -375,27 +375,39 @@ class Home extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
       children: [
-        // 1. Vault Header Card (Hero)
+        // 1. Vault Header Card (Hero Apple Liquid Glass Prism)
         AppleBounce(
           scaleFactor: 0.98,
           onTap: onLibrary,
-          child: Container(
+          child: Glass(
+            radius: 22,
+            blur: 28,
             padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF102820), Color(0xFF0A1B15)],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF0F241D).withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF064E3B).withValues(alpha: 0.92),
+                const Color(0xFF042F2E).withValues(alpha: 0.82),
               ],
             ),
+            border: Border.all(
+              color: const Color(0xFF6EE7B7).withValues(alpha: 0.45),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF064E3B).withValues(alpha: 0.28),
+                blurRadius: 28,
+                spreadRadius: -4,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: const Color(0xFF000000).withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -472,13 +484,12 @@ class Home extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        // 2. Bento Quick Metrics Grid (2 columns)
+        // 2. Bento Quick Metrics Grid (2 columns Liquid Glass)
         Row(
           children: [
             Expanded(
-              child: Container(
+              child: LiquidGlassCard(
                 padding: const EdgeInsets.all(16),
-                decoration: cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -517,9 +528,8 @@ class Home extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Container(
+              child: LiquidGlassCard(
                 padding: const EdgeInsets.all(16),
-                decoration: cardDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -576,13 +586,10 @@ class Home extends StatelessWidget {
                 for (final entry in catCounts.entries)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: Container(
+                    child: Glass(
+                      radius: 12,
+                      blur: 16,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-                      ),
                       child: Row(
                         children: [
                           Icon(
@@ -711,8 +718,7 @@ class ItemTile extends StatelessWidget {
           scaleFactor: 0.97,
           onTap: () => Navigator.push(
               context, MaterialPageRoute(builder: (_) => Detail(s, i))),
-          child: Container(
-            decoration: cardDecoration,
+          child: LiquidGlassCard(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
               Container(
@@ -790,10 +796,21 @@ class _LibraryState extends State<Library> {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 96), children: [
       Text('Library', style: t.headlineMedium?.copyWith(fontSize: 34)),
       const SizedBox(height: 14),
-      TextField(
-        onChanged: (v) => setState(() => q = v),
-        decoration: const InputDecoration(
-            hintText: 'Search product, brand or model', prefixIcon: Icon(CupertinoIcons.search)),
+      Glass(
+        radius: 14,
+        blur: 20,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: TextField(
+          onChanged: (v) => setState(() => q = v),
+          decoration: const InputDecoration(
+            fillColor: Colors.transparent,
+            hintText: 'Search product, brand or model',
+            prefixIcon: Icon(CupertinoIcons.search, color: Pal.blue),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
+        ),
       ),
       const SizedBox(height: 10),
       SingleChildScrollView(
@@ -851,37 +868,44 @@ class Detail extends StatelessWidget {
               Expanded(child: Text(v)),
             ]),
           );
-    return Scaffold(
-      appBar: AppBar(actions: [
-        IconButton(
-            tooltip: 'Delete',
-            icon: const Icon(CupertinoIcons.delete),
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                        title: const Text('Delete this warranty?'),
-                        content: const Text('The bill image is removed too if no other product uses it.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-                        ],
-                      ));
-              if (ok == true) {
-                await s.remove(i);
-                if (context.mounted) Navigator.pop(context);
-              }
-            }),
-      ]),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 32), children: [
-        Text(i.name, style: t.headlineSmall),
-        const SizedBox(height: 10),
-        Align(alignment: Alignment.centerLeft, child: StatusPill(i)),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: cardDecoration,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return DecoratedBox(
+      decoration: glassBackdrop,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          actions: [
+            IconButton(
+                tooltip: 'Delete',
+                icon: const Icon(CupertinoIcons.delete),
+                onPressed: () async {
+                  final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                            title: const Text('Delete this warranty?'),
+                            content: const Text('The bill image is removed too if no other product uses it.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
+                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                            ],
+                          ));
+                  if (ok == true) {
+                    await s.remove(i);
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                }),
+          ],
+        ),
+        body: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 32), children: [
+          Text(i.name, style: t.headlineSmall),
+          const SizedBox(height: 10),
+          Align(alignment: Alignment.centerLeft, child: StatusPill(i)),
+          const SizedBox(height: 20),
+          LiquidGlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Warranty terms', style: t.titleSmall),
             const SizedBox(height: 8),
             for (final term in i.terms)
@@ -957,8 +981,8 @@ class Detail extends StatelessWidget {
           kv('Purchase date', s.formatDate(bill.purchaseDate)),
         ],
         const SizedBox(height: 16),
-        Container(
-          decoration: cardDecoration,
+        LiquidGlassCard(
+          padding: EdgeInsets.zero,
           child: Column(children: [
             if (bill != null)
               ListTile(
@@ -993,9 +1017,8 @@ class Detail extends StatelessWidget {
         if (bill != null && isPdf(bill.imagePath)) ...[
           Text('Bill Document', style: t.titleSmall),
           const SizedBox(height: 8),
-          Container(
+          LiquidGlassCard(
             padding: const EdgeInsets.all(16),
-            decoration: cardDecoration,
             child: Column(
               children: [
                 Row(
@@ -1128,8 +1151,9 @@ class Detail extends StatelessWidget {
           ),
         ],
       ]),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ---------- 8/9. Settings and reminders ----------
