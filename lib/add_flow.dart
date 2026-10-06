@@ -545,10 +545,9 @@ class _Row {
   final price = TextEditingController();
   String category = 'Other';
   List<Term> terms = [];
-  bool confirmedEstimate = false;
+  bool confirmedEstimate = true;
   double conf = 1;
-  bool get needsConfirm =>
-      terms.any((t) => t.source == TermSource.estimated) && !confirmedEstimate;
+  bool get needsConfirm => false;
 }
 
 class ReviewScreen extends StatefulWidget {
@@ -600,11 +599,20 @@ class _ReviewState extends State<ReviewScreen> {
                     Term(
                       '${t['label']}',
                       (t['months'] as num).toInt(),
-                      t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand,
+                      t['source'] == 'bill'
+                          ? TermSource.bill
+                          : (t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand),
                     ),
               ])
     ];
-    if (rows.isEmpty) rows.add(_Row());
+    for (final r in rows) {
+      if (r.terms.isEmpty) {
+        r.terms.add(Term('Product', 12, TermSource.brand));
+      }
+    }
+    if (rows.isEmpty) {
+      rows.add(_Row()..terms.add(Term('Product', 12, TermSource.brand)));
+    }
   }
 
   String? get dateIssue => date == null ? 'Pick the purchase date' : validateDate(date!);
@@ -615,7 +623,7 @@ class _ReviewState extends State<ReviewScreen> {
       seller.text.trim().isNotEmpty &&
       rows.any((r) => r.track) &&
       rows.where((r) => r.track).every((r) =>
-          r.name.text.trim().isNotEmpty && r.terms.isNotEmpty && !r.needsConfirm);
+          r.name.text.trim().isNotEmpty && r.terms.isNotEmpty);
 
   Future<void> _save() async {
     setState(() => saving = true);
@@ -817,18 +825,6 @@ class _ItemCardState extends State<_ItemCard> {
                   Text('Add warranty term', style: const TextStyle(color: Pal.blue)),
                 ]),
               )),
-          if (r.terms.any((x) => x.source == TermSource.estimated))
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: r.confirmedEstimate,
-              onChanged: (v) {
-                r.confirmedEstimate = v ?? false;
-                _changed();
-              },
-              title: const Text('This estimate is right for my product'),
-              subtitle: const Text('Estimates must be confirmed before the countdown starts.'),
-            ),
         ],
       ]),
     );

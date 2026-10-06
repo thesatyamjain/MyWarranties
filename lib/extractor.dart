@@ -39,11 +39,12 @@ Return ONLY JSON of this shape. Use null when not printed/known. confidence is 0
            "confidence":n}]}
 
 For "standard_warranty_terms":
-- If standard brand/manufacturer warranty policy in India is known for this product/category/model, provide accurate breakdown in months.
+- Automatically determine and provide the standard brand/manufacturer warranty policy in India for this product category and brand.
+- Consumer electronics, audio, gadgets, smartphones, laptops standard is 12 months.
 - E.g. TV -> [{"label":"Product","months":12,"source":"brand"},{"label":"Panel","months":24,"source":"brand"}]
 - E.g. AC -> [{"label":"Product","months":12,"source":"brand"},{"label":"Compressor","months":120,"source":"brand"}]
-- E.g. Smartphone -> [{"label":"Product","months":12,"source":"brand"}]
 - E.g. Washing machine -> [{"label":"Product","months":24,"source":"brand"},{"label":"Motor","months":120,"source":"brand"}]
+- Default to 12 months with "source":"brand" for standard consumer retail products.
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 
