@@ -24,12 +24,17 @@ class DriveSyncService {
   static const _backupJsonFileName = 'my_warranties_backup.json';
   static const _backupFolderName = 'My Warranties Vault';
 
+  static const String serverClientId =
+      '739225721782-hq8d17q5c3lm2pcqchs2g73m8ejie83j.apps.googleusercontent.com';
+
   static GoogleSignInAccount? get currentUser => _currentUser;
 
   static Future<void> _ensureInit() async {
     if (_initialized) return;
     try {
-      await _google.initialize();
+      await _google.initialize(
+        serverClientId: serverClientId,
+      );
       _initialized = true;
     } catch (e) {
       debugPrint('GoogleSignIn init error: $e');
