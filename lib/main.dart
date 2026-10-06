@@ -10,6 +10,7 @@ import 'detail_tools.dart';
 import 'drive_sync.dart';
 import 'extractor.dart';
 import 'models.dart';
+import 'recycle_bin.dart';
 import 'share_receiver.dart';
 import 'store.dart';
 import 'theme.dart';
@@ -301,22 +302,23 @@ class Home extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final live = s.items.where((i) => i.status != WStatus.expired).toList()
+    final active = s.activeItems;
+    final live = active.where((i) => i.status != WStatus.expired).toList()
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     final soon = live.where((i) => i.status == WStatus.expiringSoon).toList();
-    final expired = s.items.where((i) => i.status == WStatus.expired).toList();
-    final recent = s.items.reversed.take(4).toList();
+    final expired = active.where((i) => i.status == WStatus.expired).toList();
+    final recent = active.reversed.take(4).toList();
     final next = live.firstOrNull;
 
     // Categories breakdown
     final catCounts = <String, int>{};
-    for (final it in s.items) {
+    for (final it in active) {
       if (it.category.isNotEmpty) {
         catCounts[it.category] = (catCounts[it.category] ?? 0) + 1;
       }
     }
 
-    if (s.items.isEmpty) {
+    if (active.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -456,7 +458,7 @@ class Home extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${s.items.length} Total',
+                        '${s.activeItems.length} Total',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -788,7 +790,7 @@ class _LibraryState extends State<Library> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final all = widget.s.items;
+    final all = widget.s.activeItems;
     final cats = {for (final i in all) i.category}.toList()..sort();
     final brands = {for (final i in all) if (i.brand.isNotEmpty) i.brand}.toList()..sort();
     final list = all.where((i) {
@@ -798,15 +800,83 @@ class _LibraryState extends State<Library> {
           (category == null || i.category == category) &&
           (brand == null || i.brand == brand);
     }).toList()
-      ..sort((a, b) => newestFirst
-          ? b.start.compareTo(a.start)
-          : a.daysLeft.compareTo(b.daysLeft)); // default: soonest expiry first
+      ..sort((a, b) {
+        if (newestFirst) {
+          return b.start.compareTo(a.start);
+        }
+        // Active & Expiring Soon warranties first (urgent expiry on top).
+        // Expired warranties pushed to the bottom, sorted by most recently expired first.
+        final aExpired = a.status == WStatus.expired;
+        final bExpired = b.status == WStatus.expired;
+        if (aExpired != bExpired) {
+          return aExpired ? 1 : -1;
+        }
+        if (aExpired) {
+          // Both are expired: show most recently expired first (e.g. -5 d before -100 d)
+          return b.daysLeft.compareTo(a.daysLeft);
+        }
+        // Both are active: soonest expiry first (e.g. 3 d before 150 d)
+        return a.daysLeft.compareTo(b.daysLeft);
+      });
     Widget chip(String label, bool on, VoidCallback tap) => Padding(
           padding: const EdgeInsets.only(right: 8),
           child: FilterChip(label: Text(label), selected: on, onSelected: (_) => tap()),
         );
+    final trashedCount = widget.s.trashedItems.length;
     return ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 96), children: [
-      Text('Library', style: t.headlineMedium?.copyWith(fontSize: 34)),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Library', style: t.headlineMedium?.copyWith(fontSize: 34)),
+          AppleBounce(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => RecycleBinScreen(widget.s)),
+            ),
+            child: Glass(
+              radius: 14,
+              blur: 16,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.trash,
+                    size: 16,
+                    color: trashedCount > 0 ? Pal.brick : Pal.muted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Bin',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: trashedCount > 0 ? Pal.brick : Pal.ink,
+                    ),
+                  ),
+                  if (trashedCount > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Pal.brick.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$trashedCount',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Pal.brick,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       const SizedBox(height: 14),
       Glass(
         radius: 14,
@@ -890,22 +960,39 @@ class Detail extends StatelessWidget {
           scrolledUnderElevation: 0,
           actions: [
             IconButton(
-                tooltip: 'Delete',
-                icon: const Icon(CupertinoIcons.delete),
+                tooltip: 'Move to Recycle Bin',
+                icon: const Icon(CupertinoIcons.trash),
                 onPressed: () async {
                   final ok = await showDialog<bool>(
                       context: context,
                       builder: (_) => AlertDialog(
-                            title: const Text('Delete this warranty?'),
-                            content: const Text('The bill image is removed too if no other product uses it.'),
+                            title: const Text('Move to Recycle Bin?'),
+                            content: const Text(
+                                'This warranty will be moved to the Recycle Bin. You can restore it anytime or permanently delete it later.'),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: TextButton.styleFrom(foregroundColor: Pal.brick),
+                                  child: const Text('Move to Bin')),
                             ],
                           ));
                   if (ok == true) {
-                    await s.remove(i);
-                    if (context.mounted) Navigator.pop(context);
+                    await s.moveToTrash(i);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('"${i.name}" moved to Recycle Bin'),
+                          behavior: SnackBarBehavior.floating,
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            textColor: Colors.amberAccent,
+                            onPressed: () => s.restoreFromTrash(i),
+                          ),
+                        ),
+                      );
+                    }
                   }
                 }),
           ],
@@ -996,6 +1083,15 @@ class Detail extends StatelessWidget {
         LiquidGlassCard(
           padding: EdgeInsets.zero,
           child: Column(children: [
+            ListTile(
+              leading: const Icon(CupertinoIcons.square_arrow_up, color: Pal.blue),
+              title: const Text('Share Warranty Card (.mywarranty)'),
+              subtitle: Text(
+                'Includes bill, countdown (${countdown(i.daysLeft)}), and all product details for 1-click import',
+                style: const TextStyle(fontSize: 12),
+              ),
+              onTap: () => shareMyWarrantyCard(i, bill),
+            ),
             if (bill != null)
               ListTile(
                   leading: const Icon(CupertinoIcons.share, color: Pal.blue),
@@ -1365,6 +1461,63 @@ class SettingsScreen extends StatelessWidget {
           style: t.bodySmall),
       const SizedBox(height: 12),
       _DriveSyncCard(s),
+      const SizedBox(height: 28),
+      Text('Recycle Bin', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Restore accidentally deleted warranties or purge them permanently.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      AppleBounce(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => RecycleBinScreen(s)),
+        ),
+        child: Glass(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: s.trashedItems.isNotEmpty
+                        ? Pal.brick.withValues(alpha: 0.12)
+                        : Pal.paper,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      CupertinoIcons.trash,
+                      size: 18,
+                      color: s.trashedItems.isNotEmpty ? Pal.brick : Pal.muted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'View Trashed Warranties',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      Text(
+                        s.trashedItems.isEmpty
+                            ? 'Bin is currently empty'
+                            : '${s.trashedItems.length} item(s) in bin',
+                        style: const TextStyle(color: Pal.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(CupertinoIcons.chevron_right, size: 16, color: Pal.muted),
+              ],
+            ),
+          ),
+        ),
+      ),
       const SizedBox(height: 28),
       Text('Device Backup', style: t.titleSmall),
       const SizedBox(height: 4),

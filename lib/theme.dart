@@ -187,16 +187,16 @@ class Glass extends StatelessWidget {
         boxShadow: boxShadow ??
             (showShadow
                 ? [
-                    // Soft ambient floor shadow
+                    // Deep ambient atmospheric occlusion
                     BoxShadow(
-                      color: const Color(0xFF001133).withValues(alpha: 0.08),
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.08),
                       blurRadius: 36,
                       spreadRadius: -4,
                       offset: const Offset(0, 14),
                     ),
-                    // Tight contact shadow for floating separation
+                    // Tight specular contact edge
                     BoxShadow(
-                      color: const Color(0xFF000000).withValues(alpha: 0.04),
+                      color: const Color(0xFF000000).withValues(alpha: 0.03),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -211,20 +211,23 @@ class Glass extends StatelessWidget {
             padding: padding,
             decoration: BoxDecoration(
               borderRadius: r,
-              // Translucent milky refractive surface with Apple directional light angle
+              // Apple Liquid Meniscus: subtle optical dispersion gradient
               gradient: gradient ??
                   LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withValues(alpha: 0.72),
-                      Colors.white.withValues(alpha: 0.38),
+                      Colors.white.withValues(alpha: 0.78),
+                      Colors.white.withValues(alpha: 0.42),
+                      Colors.white.withValues(alpha: 0.28),
+                      Colors.white.withValues(alpha: 0.52),
                     ],
-                    stops: const [0.0, 1.0],
+                    stops: const [0.0, 0.45, 0.85, 1.0],
                   ),
+              // Apple Dual-Incident Specular Border (rim catching ambient light)
               border: border ??
                   Border.all(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: Colors.white.withValues(alpha: 0.90),
                     width: 1.2,
                   ),
             ),
@@ -258,14 +261,14 @@ class LiquidGlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: r,
         boxShadow: [
-          // Ambient soft floor shadow
+          // Soft ambient floor shadow
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-            blurRadius: 20,
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 22,
             spreadRadius: -2,
             offset: const Offset(0, 8),
           ),
-          // Tight contact shadow for floating separation
+          // Tight contact edge
           BoxShadow(
             color: const Color(0xFF000000).withValues(alpha: 0.02),
             blurRadius: 6,
@@ -276,7 +279,7 @@ class LiquidGlassCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: r,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
@@ -285,13 +288,16 @@ class LiquidGlassCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withValues(alpha: 0.76),
-                  Colors.white.withValues(alpha: 0.44),
+                  Colors.white.withValues(alpha: 0.82),
+                  Colors.white.withValues(alpha: 0.46),
+                  Colors.white.withValues(alpha: 0.35),
+                  Colors.white.withValues(alpha: 0.55),
                 ],
+                stops: const [0.0, 0.40, 0.80, 1.0],
               ),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.88),
-                width: 1.2,
+                color: Colors.white.withValues(alpha: 0.92),
+                width: 1.1,
               ),
             ),
             child: child,

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:my_warranties/drive_sync.dart';
 import 'package:my_warranties/models.dart';
 import 'package:my_warranties/resolver.dart';
+import 'package:my_warranties/store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -47,5 +48,37 @@ void main() {
 
     await DriveSyncService.setAutoSyncEnabled(false);
     expect(DriveSyncService.isAutoSyncEnabled, isFalse);
+  });
+
+  test('item soft delete, restore, and permanent deletion flow', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.load();
+
+    final bill = Bill('b1', 'test_bill.jpg', 'Amazon', 'INV-100', DateTime(2026, 1, 1), 500, 'INR');
+    final item = Item('i1', 'b1', 'Sony Headphones', 'Sony', 'WH-1000XM5', '', 'Electronics', 25000, DateTime(2026, 1, 1), [Term('Standard', 12, TermSource.bill)]);
+
+    await store.add(bill, [item]);
+    expect(store.activeItems.length, 1);
+    expect(store.trashedItems.length, 0);
+
+    // 1. Soft delete -> goes to Recycle Bin
+    await store.moveToTrash(item);
+    expect(store.activeItems.length, 0);
+    expect(store.trashedItems.length, 1);
+    expect(item.deletedAt, isNotNull);
+
+    // 2. Restore -> returns to active list
+    await store.restoreFromTrash(item);
+    expect(store.activeItems.length, 1);
+    expect(store.trashedItems.length, 0);
+    expect(item.deletedAt, isNull);
+
+    // 3. Move to trash and permanently delete
+    await store.moveToTrash(item);
+    expect(store.trashedItems.length, 1);
+    await store.permanentlyDelete(item);
+    expect(store.items.length, 0);
+    expect(store.trashedItems.length, 0);
   });
 }

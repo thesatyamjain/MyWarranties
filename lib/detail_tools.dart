@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,48 @@ import 'package:open_filex/open_filex.dart';
 
 Future<void> _shareFile(String path, String text) =>
     SharePlus.instance.share(ShareParams(files: [XFile(path)], text: text));
+
+/// Export all warranty details, live countdown, terms, and embedded original bill into a single `.mywarranty` card
+Future<void> shareMyWarrantyCard(Item i, Bill? b) async {
+  String? billBase64;
+  String billExt = 'jpg';
+  if (b != null && b.imagePath.isNotEmpty) {
+    try {
+      final billFile = File(b.imagePath);
+      if (await billFile.exists()) {
+        final bytes = await billFile.readAsBytes();
+        billBase64 = base64Encode(bytes);
+        billExt = isPdf(b.imagePath) ? 'pdf' : 'jpg';
+      }
+    } catch (e) {
+      debugPrint('Error reading bill for .mywarranty: $e');
+    }
+  }
+
+  final bundle = {
+    'version': 1,
+    'format': 'mywarranty',
+    'exported_at': DateTime.now().toIso8601String(),
+    'item': i.toJson(),
+    'bill': b?.toJson(),
+    'bill_data': billBase64,
+    'bill_ext': billExt,
+    'days_left': i.daysLeft,
+    'countdown': countdown(i.daysLeft),
+  };
+
+  final jsonStr = jsonEncode(bundle);
+  final dir = await getTemporaryDirectory();
+  final sanitizedName = i.name.replaceAll(RegExp(r'[^\w\s\.-]'), '').replaceAll(' ', '_');
+  final safeName = sanitizedName.isEmpty ? 'Warranty' : sanitizedName;
+  final file = File('${dir.path}/$safeName.mywarranty');
+  await file.writeAsString(jsonStr, flush: true);
+
+  await _shareFile(
+    file.path,
+    'Warranty Card for ${i.name} (${countdown(i.daysLeft)}). Open with My Warranties.',
+  );
+}
 
 /// Open/view the PDF bill in the system PDF viewer.
 Future<void> openBillPdf(Bill b) async {

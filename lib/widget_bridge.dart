@@ -13,7 +13,7 @@ class WidgetBridge {
   static Future<void> sync(Store store) async {
     if (kIsWeb || !Platform.isAndroid) return;
     try {
-      final live = store.items.where((i) => i.status != WStatus.expired).toList()
+      final live = store.activeItems.where((i) => i.status != WStatus.expired).toList()
         ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
       final next = live.firstOrNull;
 

@@ -58,12 +58,15 @@ class Item {
   double price;
   DateTime start;
   List<Term> terms;
+  DateTime? deletedAt;
+
   Item(this.id, this.billId, this.name, this.brand, this.model, this.serial,
       this.category, this.price, this.start, this.terms,
       {this.basis = 'Purchase date',
       this.claimStatus = 'None',
       this.claimRef = '',
-      this.claimNotes = ''});
+      this.claimNotes = '',
+      this.deletedAt});
 
   /// What `start` means: purchase / delivery / installation date (FR-14).
   String basis;
@@ -103,6 +106,7 @@ class Item {
         'cs': claimStatus,
         'cr': claimRef,
         'cn': claimNotes,
+        'del': deletedAt?.toIso8601String(),
       };
   factory Item.fromJson(Map<String, dynamic> j) => Item(
       j['id'], j['bill'], j['name'], j['brand'], j['model'], j['serial'],
@@ -111,7 +115,8 @@ class Item {
       basis: j['basis'] ?? 'Purchase date',
       claimStatus: j['cs'] ?? 'None',
       claimRef: j['cr'] ?? '',
-      claimNotes: j['cn'] ?? '');
+      claimNotes: j['cn'] ?? '',
+      deletedAt: j['del'] != null ? DateTime.tryParse(j['del']) : null);
 }
 
 bool isPdf(String path) => path.toLowerCase().endsWith('.pdf');

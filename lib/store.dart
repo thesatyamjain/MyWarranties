@@ -84,6 +84,13 @@ class Store extends ChangeNotifier {
     return src.copy('${dir.path}/$id${isPdf(src.path) ? '.pdf' : '.jpg'}');
   }
 
+  /// Active warranties (not in recycle bin)
+  List<Item> get activeItems => items.where((i) => i.deletedAt == null).toList();
+
+  /// Items currently in the recycle bin
+  List<Item> get trashedItems => items.where((i) => i.deletedAt != null).toList()
+    ..sort((a, b) => (b.deletedAt ?? DateTime.now()).compareTo(a.deletedAt ?? DateTime.now()));
+
   Bill? billOf(Item i) => bills.where((b) => b.id == i.billId).firstOrNull;
 
   bool hasInvoice(String no) =>
@@ -97,7 +104,20 @@ class Store extends ChangeNotifier {
 
   Future<void> update() => _commit();
 
-  Future<void> remove(Item i) async {
+  /// Move item to Recycle Bin (soft delete)
+  Future<void> moveToTrash(Item i) async {
+    i.deletedAt = DateTime.now();
+    await _commit();
+  }
+
+  /// Restore item from Recycle Bin
+  Future<void> restoreFromTrash(Item i) async {
+    i.deletedAt = null;
+    await _commit();
+  }
+
+  /// Permanently delete single item and purge unused bill images
+  Future<void> permanentlyDelete(Item i) async {
     items.remove(i);
     final b = billOf(i);
     if (b != null && !items.any((x) => x.billId == b.id)) {
@@ -108,6 +128,25 @@ class Store extends ChangeNotifier {
     }
     await _commit();
   }
+
+  /// Empty all items from the Recycle Bin permanently
+  Future<void> emptyRecycleBin() async {
+    final toDelete = trashedItems;
+    for (final it in toDelete) {
+      items.remove(it);
+      final b = billOf(it);
+      if (b != null && !items.any((x) => x.billId == b.id)) {
+        bills.remove(b);
+        try {
+          File(b.imagePath).deleteSync();
+        } catch (_) {}
+      }
+    }
+    await _commit();
+  }
+
+  /// Backward-compatible remove calls moveToTrash
+  Future<void> remove(Item i) => moveToTrash(i);
 
   Future<void> setOffsets(List<int> o) async {
     offsets = o..sort((a, b) => b.compareTo(a));
@@ -145,28 +184,32 @@ class Store extends ChangeNotifier {
   /// Cancel-all then re-create: simple and correct for a few hundred reminders.
   Future<void> _reschedule() async {
     if (kIsWeb) return;
-    await _n.cancelAll();
-    final now = DateTime.now();
-    var id = 0;
-    for (final it in items) {
-      final end = it.endDate;
-      if (end == null) continue;
-      for (final o in offsets) {
-        final at = DateTime(end.year, end.month, end.day - o, 9);
-        if (!at.isAfter(now)) continue;
-        await _n.zonedSchedule(
-          id: id++,
-          title: o == 0 ? 'Warranty ends today' : 'Warranty ends in $o days',
-          body: '${it.name} - keep the bill handy for any claim.',
-          // Same instant, expressed in UTC, so no local-timezone plugin is needed.
-          scheduledDate: tz.TZDateTime.from(at, tz.UTC),
-          notificationDetails: const NotificationDetails(
-              android: AndroidNotificationDetails('expiry', 'Warranty reminders',
-                  importance: Importance.high),
-              iOS: DarwinNotificationDetails()),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        );
+    try {
+      await _n.cancelAll();
+      final now = DateTime.now();
+      var id = 0;
+      for (final it in activeItems) {
+        final end = it.endDate;
+        if (end == null) continue;
+        for (final o in offsets) {
+          final at = DateTime(end.year, end.month, end.day - o, 9);
+          if (!at.isAfter(now)) continue;
+          await _n.zonedSchedule(
+            id: id++,
+            title: o == 0 ? 'Warranty ends today' : 'Warranty ends in $o days',
+            body: '${it.name} - keep the bill handy for any claim.',
+            // Same instant, expressed in UTC, so no local-timezone plugin is needed.
+            scheduledDate: tz.TZDateTime.from(at, tz.UTC),
+            notificationDetails: const NotificationDetails(
+                android: AndroidNotificationDetails('expiry', 'Warranty reminders',
+                    importance: Importance.high),
+                iOS: DarwinNotificationDetails()),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          );
+        }
       }
+    } catch (e) {
+      debugPrint('Notification reschedule error: $e');
     }
   }
 

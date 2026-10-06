@@ -76,12 +76,16 @@ class MainActivity : FlutterActivity() {
     private fun handleSendIntent(intent: Intent?): List<String> {
         if (intent == null) return emptyList()
         val action = intent.action ?: return emptyList()
-        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return emptyList()
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE && action != Intent.ACTION_VIEW) {
+            return emptyList()
+        }
 
         val type = intent.type ?: ""
         val uris = mutableListOf<Uri>()
 
-        if (Intent.ACTION_SEND == action) {
+        if (Intent.ACTION_VIEW == action) {
+            intent.data?.let { uris.add(it) }
+        } else if (Intent.ACTION_SEND == action) {
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
             } else {
@@ -102,8 +106,14 @@ class MainActivity : FlutterActivity() {
         val resultPaths = mutableListOf<String>()
         for (uri in uris) {
             try {
-                val ext = if (type.contains("pdf", ignoreCase = true)) ".pdf" else ".jpg"
-                val tempFile = File(cacheDir, "shared_bill_${System.currentTimeMillis()}_${resultPaths.size}$ext")
+                var ext = if (type.contains("pdf", ignoreCase = true)) ".pdf" else ".jpg"
+                val uriString = uri.toString().lowercase()
+                val pathString = (uri.path ?: "").lowercase()
+                if (uriString.endsWith(".mywarranty") || pathString.endsWith(".mywarranty")) {
+                    ext = ".mywarranty"
+                }
+
+                val tempFile = File(cacheDir, "shared_warranty_${System.currentTimeMillis()}_${resultPaths.size}$ext")
                 contentResolver.openInputStream(uri)?.use { input ->
                     tempFile.outputStream().use { output ->
                         input.copyTo(output)

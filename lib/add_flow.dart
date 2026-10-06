@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
@@ -60,12 +61,71 @@ Future<void> startAddFlow(BuildContext context, Store store) async {
     final multi = await picker.pickMultiImage(maxWidth: 1800, imageQuality: 80);
     paths = [for (final x in multi) x.path];
   } else {
-    final x = await picker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1800,
-      imageQuality: 80,
-    );
-    paths = [if (x != null) x.path];
+    // Multi-page camera scanning: allows capturing multiple pages of a physical bill
+    final captured = <String>[];
+    while (true) {
+      final x = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1800,
+        imageQuality: 80,
+      );
+      if (x != null) {
+        captured.add(x.path);
+      } else {
+        // User tapped cancel on camera
+        break;
+      }
+
+      // If user captured 1+ pages, ask if there is another page or if they are done
+      if (!context.mounted) break;
+      final addMore = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Page ${captured.length} Captured'),
+          content: Text(
+            captured.length == 1
+                ? 'Does this bill have another page or backside (warranty terms, IMEI, store seal)?'
+                : 'You have captured ${captured.length} pages. Add another page or proceed to processing?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Done (${captured.length} page${captured.length > 1 ? "s" : ""})'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(CupertinoIcons.camera, size: 16),
+              label: const Text('Add Page'),
+            ),
+          ],
+        ),
+      );
+
+      if (addMore != true) break;
+    }
+
+    if (captured.isEmpty) return;
+
+    if (captured.length == 1) {
+      paths = [captured.first];
+    } else {
+      // Multiple pages captured: stitch them together into a unified multi-page PDF document
+      final doc = pw.Document();
+      for (final imgPath in captured) {
+        final imgBytes = await File(imgPath).readAsBytes();
+        final pwImg = pw.MemoryImage(imgBytes);
+        doc.addPage(
+          pw.Page(
+            margin: const pw.EdgeInsets.all(12),
+            build: (_) => pw.Center(child: pw.Image(pwImg, fit: pw.BoxFit.contain)),
+          ),
+        );
+      }
+      final tempDir = await getTemporaryDirectory();
+      final pdfFile = File('${tempDir.path}/scanned_bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await pdfFile.writeAsBytes(await doc.save());
+      paths = [pdfFile.path];
+    }
   }
 
   for (final p in paths) {
