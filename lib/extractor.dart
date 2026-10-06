@@ -84,6 +84,13 @@ class DefaultBillExtractor implements BillExtractor {
             }
           }
           if (supported.isNotEmpty) {
+            // Prioritize flash models and newest versions (e.g. 3.x, 2.5, 2.0)
+            supported.sort((a, b) {
+              final aFlash = a.toLowerCase().contains('flash') ? 1 : 0;
+              final bFlash = b.toLowerCase().contains('flash') ? 1 : 0;
+              if (aFlash != bFlash) return bFlash.compareTo(aFlash);
+              return b.compareTo(a);
+            });
             _cachedApiVer = ver;
             return supported;
           }
