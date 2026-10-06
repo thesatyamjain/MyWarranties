@@ -1,4 +1,4 @@
-package com.thesoftwareco.mywarranties
+package com.thesoftwarelabs.mywarranties
 
 import android.content.Context
 import io.flutter.embedding.android.FlutterActivity
@@ -6,7 +6,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val WIDGET_CHANNEL = "com.thesoftwareco.mywarranties/widget"
+    private val WIDGET_CHANNEL = "com.thesoftwarelabs.mywarranties/widget"
     private val PREFS_NAME = "WarrantyWidgetPrefs"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

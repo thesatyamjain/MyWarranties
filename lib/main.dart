@@ -1577,7 +1577,7 @@ class BuiltByFooter extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'The Software Co.',
+                    'The Software Labs',
                     style: TextStyle(
                       fontSize: 12,
                       color: Pal.blue,

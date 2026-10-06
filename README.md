@@ -140,4 +140,4 @@ flutter build web --release
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Built by [The Software Co.](https://thesoftwareco.pages.dev)
+Built by [The Software Labs](https://thesoftwareco.pages.dev)
