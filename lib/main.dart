@@ -10,6 +10,7 @@ import 'detail_tools.dart';
 import 'drive_sync.dart';
 import 'extractor.dart';
 import 'models.dart';
+import 'share_receiver.dart';
 import 'store.dart';
 import 'theme.dart';
 
@@ -111,6 +112,17 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ShareReceiver.initialize(context, widget.store);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.store;
