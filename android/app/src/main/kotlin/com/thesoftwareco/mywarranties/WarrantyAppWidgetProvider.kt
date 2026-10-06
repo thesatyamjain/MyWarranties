@@ -1,4 +1,4 @@
-package com.thesoftwareco.warranties
+package com.thesoftwareco.mywarranties
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
