@@ -1543,8 +1543,9 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
       await DriveSyncService.signIn();
     } catch (e) {
       if (mounted) {
+        final errText = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
         setState(() {
-          _statusMessage = 'Google Sign-In cancelled or failed.';
+          _statusMessage = 'Sign-In error: $errText';
           _statusOk = false;
         });
       }
