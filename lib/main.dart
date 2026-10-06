@@ -570,6 +570,7 @@ class Detail extends StatelessWidget {
         if (bill != null) ...[
           kv('Seller', bill.seller),
           kv('Invoice', bill.invoiceNo),
+          kv('Purchase date', _date.format(bill.purchaseDate)),
         ],
         const SizedBox(height: 16),
         Container(

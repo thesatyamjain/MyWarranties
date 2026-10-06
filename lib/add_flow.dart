@@ -750,9 +750,22 @@ class _DateField extends StatelessWidget {
             if (d != null) onPick(d);
           },
           child: InputDecorator(
-            decoration: lowDecoration('Purchase date (warranty starts here)', conf < 0.8)
+            decoration: lowDecoration('Purchase date (DD/MM/YY)', conf < 0.8)
                 .copyWith(errorText: issue),
-            child: Text(date == null ? 'Select date' : DateFormat('dd/MM/yy').format(date!)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  date == null ? 'Select date (DD/MM/YY)' : DateFormat('dd/MM/yy').format(date!),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: date != null ? FontWeight.w600 : FontWeight.w400,
+                    color: date != null ? Pal.ink : Pal.muted,
+                  ),
+                ),
+                const Icon(CupertinoIcons.calendar, size: 18, color: Pal.muted),
+              ],
+            ),
           ),
         ),
       );

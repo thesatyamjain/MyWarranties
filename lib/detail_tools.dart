@@ -11,11 +11,20 @@ import 'models.dart';
 import 'store.dart';
 import 'theme.dart';
 
+import 'package:open_filex/open_filex.dart';
+
 Future<void> _shareFile(String path, String text) =>
     SharePlus.instance.share(ShareParams(files: [XFile(path)], text: text));
 
-/// Open/view the PDF bill in the system PDF viewer, or fallback to share sheet.
+/// Open/view the PDF bill in the system PDF viewer.
 Future<void> openBillPdf(Bill b) async {
+  try {
+    final result = await OpenFilex.open(b.imagePath);
+    if (result.type == ResultType.done) return;
+  } catch (e) {
+    debugPrint('OpenFilex error: $e');
+  }
+  // If no viewer app handled it or error occurred, fallback to canLaunchUrl
   try {
     final uri = Uri.file(b.imagePath);
     if (await canLaunchUrl(uri)) {
@@ -23,7 +32,7 @@ Future<void> openBillPdf(Bill b) async {
       return;
     }
   } catch (_) {}
-  // Fallback to native system share/open sheet
+  // Final fallback to system share
   await SharePlus.instance.share(ShareParams(files: [XFile(b.imagePath)], text: 'Bill'));
 }
 
