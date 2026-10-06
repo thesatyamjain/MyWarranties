@@ -143,7 +143,10 @@ class _ProcessingState extends State<ProcessingScreen> {
                     : (error ?? '')
                         .replaceFirst('Bad state: ', '')
                         .replaceFirst('HttpException: ', '')
-                        .replaceFirst('StateError: ', ''),
+                        .replaceFirst('StateError: ', '')
+                        .replaceFirst('SocketException: ', '')
+                        .replaceFirst('ClientException: ', '')
+                        .replaceAll(RegExp(r',?\s*uri=https?:\S+'), ''),
                 textAlign: TextAlign.center,
                 style: t.bodyMedium),
             const SizedBox(height: 20),

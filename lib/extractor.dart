@@ -60,30 +60,50 @@ class DefaultBillExtractor implements BillExtractor {
 
   Future<http.Response> _postExtraction(String key, File file, String model) async {
     final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key');
-    return await http
-        .post(
-          uri,
-          headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'parts': [
-                  {'text': _prompt},
-                  {
-                    'inline_data': {
-                      'mime_type': file.path.toLowerCase().endsWith('.pdf')
-                          ? 'application/pdf'
-                          : 'image/jpeg',
-                      'data': base64Encode(await file.readAsBytes())
-                    }
-                  }
-                ]
+    final bytes = await file.readAsBytes();
+    final mime = file.path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+    final payload = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': _prompt},
+            {
+              'inlineData': {
+                'mimeType': mime,
+                'data': base64Encode(bytes),
               }
-            ],
-            'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
-          }),
-        )
-        .timeout(const Duration(seconds: 45));
+            }
+          ]
+        }
+      ],
+      'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0},
+    });
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      final client = http.Client();
+      try {
+        return await client
+            .post(
+              uri,
+              headers: {
+                'x-goog-api-key': key,
+                'content-type': 'application/json',
+                'Connection': 'close',
+              },
+              body: payload,
+            )
+            .timeout(const Duration(seconds: 60));
+      } on SocketException catch (_) {
+        if (attempt == 1) rethrow;
+        await Future.delayed(const Duration(milliseconds: 600));
+      } on http.ClientException catch (_) {
+        if (attempt == 1) rethrow;
+        await Future.delayed(const Duration(milliseconds: 600));
+      } finally {
+        client.close();
+      }
+    }
+    throw const SocketException('Connection failed after retry.');
   }
 
   @override
@@ -136,11 +156,19 @@ class DefaultBillExtractor implements BillExtractor {
       return Extraction(j);
     } on SocketException {
       throw const SocketException('No internet connection. Please check your network and try again.');
+    } on http.ClientException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('connection abort') || msg.contains('socket') || msg.contains('closed')) {
+        throw const SocketException('Network connection was interrupted. Please check your network and try again.');
+      }
+      throw SocketException('Network request failed: ${e.message}');
     } catch (e) {
       if (e is NotABill || e is StateError || e is HttpException) rethrow;
-      final msg = e.toString();
-      if (msg.contains('SocketException') || msg.contains('Failed host lookup')) {
-        throw const SocketException('No internet connection. Please check your network and try again.');
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('socketexception') ||
+          msg.contains('failed host lookup') ||
+          msg.contains('connection abort')) {
+        throw const SocketException('Network connection interrupted. Please check your network and try again.');
       }
       rethrow;
     }
@@ -157,11 +185,14 @@ Future<({bool ok, String message})> testApiKey(String apiKey) async {
   final key = apiKey.trim();
   if (key.isEmpty) return (ok: false, message: 'Please enter an API key.');
   try {
-    final res = await http
+    final client = http.Client();
+    final res = await client
         .get(
           Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$key&pageSize=1'),
+          headers: {'x-goog-api-key': key, 'Connection': 'close'},
         )
         .timeout(const Duration(seconds: 10));
+    client.close();
 
     if (res.statusCode == 200) {
       return (ok: true, message: 'API Key is valid and working!');
@@ -172,6 +203,10 @@ Future<({bool ok, String message})> testApiKey(String apiKey) async {
     } else {
       return (ok: false, message: 'Gemini service responded with error (${res.statusCode}).');
     }
+  } on SocketException {
+    return (ok: false, message: 'No internet connection. Please check your network.');
+  } on http.ClientException catch (e) {
+    return (ok: false, message: 'Connection error: ${e.message}');
   } catch (e) {
     final msg = e.toString();
     if (msg.contains('SocketException') || msg.contains('Failed host lookup')) {

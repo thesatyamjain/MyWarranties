@@ -9,6 +9,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'models.dart';
+import 'widget_bridge.dart';
 
 /// Local-first store. ponytail: JSON blob in SharedPreferences is fine for
 /// hundreds of items; swap for Firestore/SQLite when cloud sync (FR-27) lands.
@@ -35,6 +36,7 @@ class Store extends ChangeNotifier {
     if (!kIsWeb) {
       _initNotifications();
     }
+    WidgetBridge.sync(this);
   }
 
   Future<void> setApiKey(String key) async {
@@ -126,6 +128,7 @@ class Store extends ChangeNotifier {
           'offsets': offsets,
         }));
     await _reschedule();
+    await WidgetBridge.sync(this);
     notifyListeners();
   }
 
