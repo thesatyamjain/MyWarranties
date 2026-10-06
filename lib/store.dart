@@ -37,6 +37,8 @@ class Store extends ChangeNotifier {
       items = [for (final i in j['items']) Item.fromJson(i)];
       offsets = List<int>.from(j['offsets'] ?? offsets);
     }
+    // Auto-purge any items trashed for more than 30 days
+    await autoPurgeOldTrash();
     onboarded = _p.getBool('onboarded') ?? false;
     userApiKey = _p.getString('gemini_api_key') ?? '';
     if (!kIsWeb) {
@@ -133,6 +135,26 @@ class Store extends ChangeNotifier {
   Future<void> emptyRecycleBin() async {
     final toDelete = trashedItems;
     for (final it in toDelete) {
+      items.remove(it);
+      final b = billOf(it);
+      if (b != null && !items.any((x) => x.billId == b.id)) {
+        bills.remove(b);
+        try {
+          File(b.imagePath).deleteSync();
+        } catch (_) {}
+      }
+    }
+    await _commit();
+  }
+
+  /// Automatically purges items trashed more than 30 days ago
+  Future<void> autoPurgeOldTrash({int retentionDays = 30}) async {
+    final threshold = DateTime.now().subtract(Duration(days: retentionDays));
+    final expiredInTrash = trashedItems.where((i) =>
+        i.deletedAt != null && i.deletedAt!.isBefore(threshold)).toList();
+    if (expiredInTrash.isEmpty) return;
+
+    for (final it in expiredInTrash) {
       items.remove(it);
       final b = billOf(it);
       if (b != null && !items.any((x) => x.billId == b.id)) {

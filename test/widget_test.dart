@@ -81,4 +81,26 @@ void main() {
     expect(store.items.length, 0);
     expect(store.trashedItems.length, 0);
   });
+
+  test('30-day auto-purge removes expired trash items', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.load();
+
+    final bill = Bill('b2', 'test2.jpg', 'Flipkart', 'INV-200', DateTime(2025, 1, 1), 1000, 'INR');
+    // Item trashed 35 days ago (should be purged)
+    final oldItem = Item('iOld', 'b2', 'Old Case', 'Spigen', 'Rugged', '', 'Accessories', 500, DateTime(2025, 1, 1), [Term('Standard', 6, TermSource.bill)], deletedAt: DateTime.now().subtract(const Duration(days: 35)));
+    // Item trashed 5 days ago (should NOT be purged)
+    final recentItem = Item('iRecent', 'b2', 'New Charger', 'Apple', '20W', '', 'Accessories', 1900, DateTime(2026, 1, 1), [Term('Standard', 12, TermSource.bill)], deletedAt: DateTime.now().subtract(const Duration(days: 5)));
+
+    store.bills.add(bill);
+    store.items.addAll([oldItem, recentItem]);
+
+    expect(store.trashedItems.length, 2);
+
+    await store.autoPurgeOldTrash(retentionDays: 30);
+
+    expect(store.trashedItems.length, 1);
+    expect(store.trashedItems.first.id, 'iRecent');
+  });
 }

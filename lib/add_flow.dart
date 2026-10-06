@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import 'batch_queue.dart';
 import 'extractor.dart';
 import 'models.dart';
 import 'resolver.dart';
@@ -128,15 +129,31 @@ Future<void> startAddFlow(BuildContext context, Store store) async {
     }
   }
 
-  for (final p in paths) {
+  if (paths.isEmpty) return;
+
+  // PRD F2: If multiple files selected (2 to 20 bills), process through background Batch Review Queue
+  if (paths.length > 1) {
+    if (!context.mounted) return;
+    await BatchQueueController.instance.enqueueFiles(paths, store);
     if (!context.mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProcessingScreen(store: store, file: File(p)),
+        builder: (_) => BatchQueueScreen(store: store),
       ),
     );
+    return;
   }
+
+  // Single file: direct instant ProcessingScreen
+  final p = paths.first;
+  if (!context.mounted) return;
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ProcessingScreen(store: store, file: File(p)),
+    ),
+  );
 }
 
 class _AddBillSheet extends StatelessWidget {

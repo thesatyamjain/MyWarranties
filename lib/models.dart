@@ -51,6 +51,52 @@ class Bill {
       (j['total'] as num).toDouble(), j['cur']);
 }
 
+class ExtendedPlan {
+  final String id;
+  String type; // 'Extended warranty' or 'AMC'
+  String provider;
+  DateTime start;
+  int months;
+  double cost;
+  String notes;
+  String? billImagePath;
+
+  ExtendedPlan({
+    required this.id,
+    this.type = 'Extended warranty',
+    this.provider = '',
+    required this.start,
+    this.months = 12,
+    this.cost = 0.0,
+    this.notes = '',
+    this.billImagePath,
+  });
+
+  DateTime get endDate => addMonths(start, months);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type,
+        'provider': provider,
+        'start': start.toIso8601String(),
+        'months': months,
+        'cost': cost,
+        'notes': notes,
+        'billImg': billImagePath,
+      };
+
+  factory ExtendedPlan.fromJson(Map<String, dynamic> j) => ExtendedPlan(
+        id: j['id'] ?? '',
+        type: j['type'] ?? 'Extended warranty',
+        provider: j['provider'] ?? '',
+        start: DateTime.tryParse(j['start'] ?? '') ?? DateTime.now(),
+        months: (j['months'] as num?)?.toInt() ?? 12,
+        cost: (j['cost'] as num?)?.toDouble() ?? 0.0,
+        notes: j['notes'] ?? '',
+        billImagePath: j['billImg'],
+      );
+}
+
 /// One product on a bill, plus its warranty terms.
 class Item {
   final String id, billId;
@@ -58,11 +104,13 @@ class Item {
   double price;
   DateTime start;
   List<Term> terms;
+  List<ExtendedPlan> extendedPlans;
   DateTime? deletedAt;
 
   Item(this.id, this.billId, this.name, this.brand, this.model, this.serial,
       this.category, this.price, this.start, this.terms,
-      {this.basis = 'Purchase date',
+      {this.extendedPlans = const [],
+      this.basis = 'Purchase date',
       this.claimStatus = 'None',
       this.claimRef = '',
       this.claimNotes = '',
@@ -76,10 +124,20 @@ class Item {
 
   DateTime endOf(Term t) => addMonths(start, t.months);
 
-  /// Latest end across all terms (warranty is "live" while any term is).
-  DateTime? get endDate => terms.isEmpty
+  /// Latest end of manufacturer standard terms
+  DateTime? get mfgEndDate => terms.isEmpty
       ? null
       : terms.map(endOf).reduce((a, b) => a.isAfter(b) ? a : b);
+
+  /// Latest overall coverage end across both manufacturer terms and extended plans
+  DateTime? get endDate {
+    final ends = <DateTime>[];
+    if (mfgEndDate != null) ends.add(mfgEndDate!);
+    for (final p in extendedPlans) {
+      ends.add(p.endDate);
+    }
+    return ends.isEmpty ? null : ends.reduce((a, b) => a.isAfter(b) ? a : b);
+  }
 
   int get daysLeft => endDate == null
       ? 0
@@ -102,6 +160,7 @@ class Item {
         'price': price,
         'start': start.toIso8601String(),
         'terms': terms.map((t) => t.toJson()).toList(),
+        'plans': extendedPlans.map((p) => p.toJson()).toList(),
         'basis': basis,
         'cs': claimStatus,
         'cr': claimRef,
@@ -112,6 +171,10 @@ class Item {
       j['id'], j['bill'], j['name'], j['brand'], j['model'], j['serial'],
       j['cat'], (j['price'] as num).toDouble(), DateTime.parse(j['start']),
       [for (final t in j['terms']) Term.fromJson(t)],
+      extendedPlans: [
+        if (j['plans'] != null)
+          for (final p in j['plans']) ExtendedPlan.fromJson(Map<String, dynamic>.from(p))
+      ],
       basis: j['basis'] ?? 'Purchase date',
       claimStatus: j['cs'] ?? 'None',
       claimRef: j['cr'] ?? '',

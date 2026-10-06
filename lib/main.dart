@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'add_flow.dart';
+import 'batch_queue.dart';
 import 'detail_tools.dart';
 import 'drive_sync.dart';
 import 'extractor.dart';
@@ -28,6 +29,7 @@ void main() async {
   final store = Store();
   try {
     await store.load();
+    await BatchQueueController.instance.load();
   } catch (e, st) {
     debugPrint('Store load error: $e\n$st');
   }
@@ -145,6 +147,65 @@ class _ShellState extends State<Shell> {
               statusBarBrightness: Brightness.light,
             ),
             actions: [
+              ListenableBuilder(
+                listenable: BatchQueueController.instance,
+                builder: (context, _) {
+                  final pending = BatchQueueController.instance.items
+                      .where((i) => i.status != BatchItemStatus.confirmed)
+                      .length;
+                  if (pending == 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Semantics(
+                      button: true,
+                      label: 'Batch queue ($pending pending)',
+                      child: AppleBounce(
+                        scaleFactor: 0.90,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BatchQueueScreen(store: s),
+                          ),
+                        ),
+                        child: Glass(
+                          radius: 22,
+                          blur: 20,
+                          showShadow: false,
+                          child: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                const Icon(CupertinoIcons.square_stack_3d_up_fill, color: Pal.blue, size: 20),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Pal.brick,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '$pending',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 20),
                 child: Semantics(
@@ -1052,6 +1113,64 @@ class Detail extends StatelessWidget {
                 Text(' may apply.', style: t.bodySmall),
               ],
             ),
+            if (i.extendedPlans.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Color(0x15000000)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Extended Coverage & AMC',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  Text('${i.extendedPlans.length} active plan(s)',
+                      style: const TextStyle(color: Pal.blue, fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (final plan in i.extendedPlans)
+                InkWell(
+                  onTap: () => showAddExtendedPlanSheet(context, s, i, existing: plan),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Pal.paper,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Pal.greenBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(CupertinoIcons.checkmark_shield_fill, size: 16, color: Pal.green),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${plan.type} · ${plan.provider}',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              Text(
+                                'Ends ${s.formatDate(plan.endDate)} (${plan.months} mos)${plan.cost > 0 ? " · ₹${plan.cost.toStringAsFixed(0)}" : ""}',
+                                style: const TextStyle(color: Pal.muted, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(CupertinoIcons.pencil, size: 14, color: Pal.muted),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
             Row(
               children: [
                 TextButton(
@@ -1084,6 +1203,28 @@ class Detail extends StatelessWidget {
           padding: EdgeInsets.zero,
           child: Column(children: [
             ListTile(
+              leading: const Icon(CupertinoIcons.briefcase_fill, color: Pal.blue),
+              title: const Text('Claim-Ready Kit (PDF + Service Contacts)'),
+              subtitle: const Text(
+                '1-tap export official claim dossier & direct authorised helpline numbers',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(CupertinoIcons.chevron_right, size: 14, color: Pal.muted),
+              onTap: () => showClaimReadyKitDialog(context, s, i, bill),
+            ),
+            ListTile(
+              leading: const Icon(CupertinoIcons.shield_lefthalf_fill, color: Pal.blue),
+              title: const Text('Add Extended Warranty / AMC'),
+              subtitle: Text(
+                i.extendedPlans.isEmpty
+                    ? 'Attach extra protection or annual maintenance plan'
+                    : '${i.extendedPlans.length} extended plan(s) attached',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(CupertinoIcons.plus_circle, size: 16, color: Pal.blue),
+              onTap: () => showAddExtendedPlanSheet(context, s, i),
+            ),
+            ListTile(
               leading: const Icon(CupertinoIcons.square_arrow_up, color: Pal.blue),
               title: const Text('Share Warranty Card (.mywarranty)'),
               subtitle: Text(
@@ -1100,8 +1241,8 @@ class Detail extends StatelessWidget {
                   onTap: () => shareBillPdf(i, bill)),
             ListTile(
                 leading: const Icon(CupertinoIcons.phone, color: Pal.blue),
-                title: const Text('Find brand support'),
-                subtitle: Text('Customer care for ${i.brand.isEmpty ? 'this product' : i.brand}'),
+                title: const Text('Authorised brand support'),
+                subtitle: Text('Direct care contact for ${i.brand.isEmpty ? 'this product' : i.brand}'),
                 onTap: () => openSupport(i)),
             ListTile(
                 leading: const Icon(CupertinoIcons.doc_text, color: Pal.blue),
@@ -1519,6 +1660,56 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 28),
+      Text('Storage & Device', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Inspect local invoice storage size and clean cached temporary files.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      AppleBounce(
+        onTap: () => showStorageManagerSheet(context, s),
+        child: Glass(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Pal.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      CupertinoIcons.device_phone_portrait,
+                      size: 18,
+                      color: Pal.blue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Storage & Cache Hygiene',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      Text(
+                        'Clean temp exports and inspect invoice memory',
+                        style: TextStyle(color: Pal.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(CupertinoIcons.chevron_right, size: 16, color: Pal.muted),
+              ],
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 28),
       Text('Device Backup', style: t.titleSmall),
       const SizedBox(height: 4),
       Text('Android Auto-Backup is enabled. Files also back up automatically when Android device backup is active.',
@@ -1705,19 +1896,34 @@ class BuiltByFooter extends StatelessWidget {
     }
   }
 
+  Future<void> _launchSupportEmail() async {
+    final emailUri = Uri(
+      scheme: 'mailto',
+      path: 'support@thesoftwarelabs.com',
+      query: 'subject=My Warranties App Feedback & Support&body=App Version: 1.1.7\nOS: Android\n\nHi The Software Labs Team,\n\n',
+    );
+    try {
+      if (!await launchUrl(emailUri, mode: LaunchMode.externalApplication)) {
+        await launchUrl(emailUri);
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
           children: [
             InkWell(
               onTap: () => _showTermsDialog(context),
               borderRadius: BorderRadius.circular(4),
               child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Text(
                   'Terms & Conditions',
                   style: TextStyle(
@@ -1734,13 +1940,52 @@ class BuiltByFooter extends StatelessWidget {
               onTap: () => _showPrivacyDialog(context),
               borderRadius: BorderRadius.circular(4),
               child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Text(
                   'Privacy Policy',
                   style: TextStyle(
                     fontSize: 12,
                     color: Pal.muted,
                     fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+            const Text('·', style: TextStyle(color: Pal.muted, fontSize: 14)),
+            InkWell(
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'My Warranties',
+                applicationVersion: '1.1.7',
+                applicationLegalese: 'Crafted with privacy-first architecture by The Software Labs',
+              ),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Text(
+                  'Licenses',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Pal.muted,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+            const Text('·', style: TextStyle(color: Pal.muted, fontSize: 14)),
+            InkWell(
+              onTap: () => _launchSupportEmail(),
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Text(
+                  'Support & Feedback',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Pal.blue,
+                    fontWeight: FontWeight.w600,
                     decoration: TextDecoration.underline,
                   ),
                 ),

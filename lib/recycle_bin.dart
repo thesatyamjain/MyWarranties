@@ -127,7 +127,7 @@ class RecycleBinScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Items in the bin won\'t send expiry alerts until restored.',
+                            'Items in the bin are automatically erased permanently after 30 days.',
                             style: t.bodySmall?.copyWith(
                               color: const Color(0xFF8A6200),
                               fontWeight: FontWeight.w500,
@@ -139,40 +139,64 @@ class RecycleBinScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   for (final item in trashed)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: LiquidGlassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.name,
-                                        style: t.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
+                    () {
+                      final daysRemaining = item.deletedAt != null
+                          ? 30 - DateTime.now().difference(item.deletedAt!).inDays
+                          : 30;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: LiquidGlassCard(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          style: t.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        [
-                                          if (item.brand.isNotEmpty) item.brand,
-                                          if (item.deletedAt != null)
-                                            'Deleted ${DateFormat('dd MMM, hh:mm a').format(item.deletedAt!)}',
-                                        ].join(' · '),
-                                        style: t.bodySmall?.copyWith(color: Pal.muted),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          [
+                                            if (item.brand.isNotEmpty) item.brand,
+                                            if (item.deletedAt != null)
+                                              'Deleted ${DateFormat('dd MMM').format(item.deletedAt!)}',
+                                          ].join(' · '),
+                                          style: t.bodySmall?.copyWith(color: Pal.muted),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: daysRemaining <= 5
+                                          ? Pal.brick.withValues(alpha: 0.12)
+                                          : Pal.paper,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      daysRemaining <= 1
+                                          ? 'Purges today'
+                                          : '$daysRemaining days left',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: daysRemaining <= 5 ? Pal.brick : Pal.muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             const SizedBox(height: 14),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
@@ -251,7 +275,8 @@ class RecycleBinScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
+                    );
+                  }(),
                 ],
               ),
       ),
