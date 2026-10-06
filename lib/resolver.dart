@@ -11,13 +11,18 @@ const _categories = <String, (String, int)>{
   'microwave': ('Kitchen appliance', 12), 'oven': ('Kitchen appliance', 12),
   'headphone': ('Audio', 12), 'earbuds': ('Audio', 12), 'speaker': ('Audio', 12),
   'watch': ('Wearable', 12),
+  'power bank': ('Power bank', 12), 'powerbank': ('Power bank', 12), 'pb': ('Power bank', 12),
+  'monitor': ('Computer hardware', 36), 'ssd': ('Computer hardware', 36),
+  'hard drive': ('Computer hardware', 36), 'hdd': ('Computer hardware', 36),
 };
 
-/// Small curated brand+category table. ponytail: tiny seed list; grow it or
-/// back it with a server table plus cached AI lookup (PRD section 7).
+/// Small curated brand+category table. ponytail: growing seed list based on real retailer & brand policies.
 const _brandPolicy = <String, int>{
   'apple|Phone': 12, 'samsung|Phone': 12, 'samsung|TV': 12,
   'lg|Washing machine': 24, 'lg|TV': 12, 'sony|TV': 12, 'apple|Laptop': 12,
+  'duracell|Power bank': 24, 'duracell|Other': 24, 'duracell|Electronics': 24,
+  'dell|Computer hardware': 36, 'sandisk|Computer hardware': 36,
+  'western digital|Computer hardware': 36, 'wd|Computer hardware': 36,
 };
 
 String guessCategory(String name) {

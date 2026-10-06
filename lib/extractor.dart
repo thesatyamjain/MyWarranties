@@ -24,7 +24,8 @@ class Extraction {
 }
 
 const _prompt = '''
-You read purchase bills / invoices (India: GST invoices, thermal store bills, marketplace invoices; English or Hindi).
+You are an expert consumer protection, retail, and warranty analyst for India and global consumer products.
+You read purchase bills / invoices (India: GST invoices, thermal store bills, marketplace invoices from Amazon, Flipkart, Reliance Digital, Croma, Vijay Sales, etc.; English or Hindi).
 Return ONLY JSON of this shape. Use null when not printed/known. confidence is 0..1.
 {"is_bill": true,
  "seller":{"value":str,"confidence":n},
@@ -36,15 +37,29 @@ Return ONLY JSON of this shape. Use null when not printed/known. confidence is 0
  "items":[{"product_name":str,"brand":str,"model":str,"serial_no":str,"price":number,
            "printed_warranty":str or null,
            "standard_warranty_terms":[{"label":str,"months":number,"source":"brand" or "estimated"}],
+           "warranty_summary":str or null,
+           "support_contact":str or null,
            "confidence":n}]}
 
-For "standard_warranty_terms":
-- Automatically determine and provide the standard brand/manufacturer warranty policy in India for this product category and brand.
-- Consumer electronics, audio, gadgets, smartphones, laptops standard is 12 months.
-- E.g. TV -> [{"label":"Product","months":12,"source":"brand"},{"label":"Panel","months":24,"source":"brand"}]
-- E.g. AC -> [{"label":"Product","months":12,"source":"brand"},{"label":"Compressor","months":120,"source":"brand"}]
-- E.g. Washing machine -> [{"label":"Product","months":24,"source":"brand"},{"label":"Motor","months":120,"source":"brand"}]
-- Default to 12 months with "source":"brand" for standard consumer retail products.
+CRITICAL RULES FOR "standard_warranty_terms" (Determine real-world official manufacturer coverage in India):
+1. Power Banks & Charging Accessories:
+   - Duracell Power Banks: Standard 24 months (2 years) manufacturer warranty.
+   - Anker, Mi/Xiaomi, Realme, Ambrane, boAt, Portronics: 6 or 12 months depending on model.
+2. PC Components & Storage:
+   - External SSD/HDD (SanDisk, WD, Seagate): 36 months (3 years) to 60 months (5 years).
+   - Monitors (Dell, LG, Samsung, BenQ): 36 months (3 years).
+   - RAM (Corsair, Kingston): 120 months (10 years / Lifetime).
+3. Major Home Appliances (Multi-part breakdown):
+   - Air Conditioners (Daikin, Voltas, LG, Lloyd, Blue Star): [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"PCB","months":60,"source":"brand"},{"label":"Compressor","months":120,"source":"brand"}]
+   - Refrigerators (Samsung, LG, Whirlpool): [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"Digital Inverter Compressor","months":240,"source":"brand"}] (or 120 months for standard).
+   - Washing Machines (LG, Bosch, IFB, Samsung): [{"label":"Comprehensive","months":24,"source":"brand"},{"label":"Motor","months":120,"source":"brand"}]
+   - Water Purifiers (Kent, Aquaguard, Pureit): [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"RO Membrane","months":12,"source":"brand"}]
+   - Microwave Ovens (IFB, Samsung, LG): [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"Magnetron","months":36,"source":"brand"}]
+4. Televisions (Sony, Samsung, LG, TCL, Xiaomi):
+   - [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"Display Panel","months":24,"source":"brand"}]
+5. Audio & Wearables (Apple, Sony, boAt, Noise, Fire-Boltt, JBL):
+   - Standard 12 months.
+6. If the specific brand and model offers an extended or non-standard duration (e.g. Duracell power bank = 24 months), use that exact duration with "source":"brand".
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 
@@ -301,6 +316,82 @@ Future<({bool ok, String message})> testApiKey(String apiKey) async {
       return (ok: false, message: 'No internet connection. Please check your network.');
     }
     return (ok: false, message: 'Network connection failed: $e');
+  }
+}
+
+/// Dynamic AI Warranty Research: Searches the product's official manufacturer & retailer
+/// warranty terms via Gemini AI and returns structured terms, justification, and support info.
+Future<({List<Map<String, dynamic>> terms, String summary, String? support})> queryProductWarrantyPolicy({
+  required String productName,
+  required String brand,
+  required String model,
+  required String seller,
+  String? apiKey,
+}) async {
+  final effectiveKey = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : _key;
+  if (effectiveKey.isEmpty) {
+    throw StateError('Please configure your Gemini API Key in Settings to search warranty policies.');
+  }
+
+  final promptText = '''
+You are an expert warranty researcher and consumer rights specialist for India and international consumer goods.
+Search and determine the official manufacturer warranty policy and terms for this exact product:
+- Product: $productName
+- Brand: $brand
+- Model: $model
+- Retailer / Seller: $seller
+
+Determine:
+1. The exact official standard manufacturer warranty period (in months) in India.
+2. If there are component-specific warranties (e.g. Battery vs Body, Panel vs TV, Motor vs Washing machine, Compressor vs AC), provide a list of terms.
+3. Official customer care contact or helpline (toll-free number or email).
+4. A 1-2 sentence concise summary explaining the coverage source (e.g. "Duracell India provides 2 Years (24 Months) replacement warranty for power banks via authorized distributors like Reliance Digital.").
+
+Return ONLY a JSON object in this exact shape:
+{
+  "terms": [
+    {"label": "Product", "months": 24, "source": "brand"}
+  ],
+  "summary": "Duracell power banks carry a 2-year (24 months) manufacturer warranty in India.",
+  "support": "1800-120-7897 / info@uclindia.com"
+}
+''';
+
+  final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$effectiveKey');
+  final payload = jsonEncode({
+    'contents': [
+      {
+        'parts': [{'text': promptText}]
+      }
+    ],
+    'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0.1},
+  });
+
+  final client = http.Client();
+  try {
+    final res = await client.post(
+      uri,
+      headers: {'x-goog-api-key': effectiveKey, 'content-type': 'application/json', 'Connection': 'close'},
+      body: payload,
+    ).timeout(const Duration(seconds: 25));
+
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body);
+      final rawText = body['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
+      final parsed = jsonDecode(rawText) as Map<String, dynamic>;
+      final rawTerms = (parsed['terms'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      return (
+        terms: rawTerms,
+        summary: parsed['summary']?.toString() ?? '',
+        support: parsed['support']?.toString(),
+      );
+    } else {
+      throw HttpException('Gemini search failed (${res.statusCode})');
+    }
+  } finally {
+    client.close();
   }
 }
 
