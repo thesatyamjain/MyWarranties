@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'add_flow.dart';
@@ -1535,7 +1534,7 @@ class BuiltByFooter extends StatelessWidget {
                 ),
               ),
               const Text(
-                'The software co.',
+                'The Software Co.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Pal.blue,

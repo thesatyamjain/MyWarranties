@@ -797,12 +797,67 @@ class _ItemCardState extends State<_ItemCard> {
       padding: const EdgeInsets.all(14),
       decoration: cardDecoration,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Checkbox(value: r.track, onChanged: (v) {
-            r.track = v ?? true;
-            _changed();
-          }),
-          Expanded(child: Text('Track this product', style: t.titleSmall)),
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Checkbox(
+            value: r.track,
+            onChanged: (v) {
+              r.track = v ?? true;
+              _changed();
+            },
+          ),
+          Expanded(
+            child: r.track
+                ? Text('Track this product', style: t.titleSmall)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.name.text.trim().isNotEmpty
+                            ? r.name.text.trim()
+                            : (r.brand.text.trim().isNotEmpty
+                                ? '${r.brand.text.trim()} Product'
+                                : 'Excluded Product'),
+                        style: t.titleSmall?.copyWith(
+                          color: Pal.muted,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Pal.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (r.brand.text.trim().isNotEmpty) ...[
+                            Text(
+                              r.brand.text.trim(),
+                              style: const TextStyle(fontSize: 12, color: Pal.muted),
+                            ),
+                            const Text(' · ', style: TextStyle(color: Pal.muted, fontSize: 12)),
+                          ],
+                          const Text(
+                            'Not tracked · Tap checkbox to include',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Pal.muted,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+          if (!r.track)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Excluded',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Pal.muted),
+              ),
+            ),
         ]),
         if (r.track) ...[
           _Field('Product name', r.name, r.conf, onChanged: _changed),
