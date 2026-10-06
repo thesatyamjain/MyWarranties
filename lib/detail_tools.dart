@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models.dart';
+import 'resolver.dart';
 import 'store.dart';
 import 'theme.dart';
 
@@ -181,4 +182,43 @@ Future<void> showClaimSheet(BuildContext context, Store s, Item i) {
       ),
     ),
   );
+}
+
+/// Allows users to re-evaluate an older item's warranty against the new brand policy.
+Future<void> recheckWarrantyPolicy(BuildContext context, Store s, Item i) async {
+  final resolved = resolveWarranty(
+    name: i.name,
+    brand: i.brand,
+    category: i.category,
+    aiTerms: [Term('Product', 12, TermSource.brand)],
+  );
+
+  final updatedTerms = resolved.isNotEmpty ? resolved : [Term('Product', 12, TermSource.brand)];
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Update warranty terms?'),
+      content: Text(
+        'Based on brand standards for ${i.brand.isNotEmpty ? i.brand : i.name}, '
+        'the suggested coverage is:\n\n' +
+            updatedTerms.map((t) => '• ${t.label}: ${t.months} months (${sourceLabel[t.source]})').join('\n') +
+            '\n\nWould you like to update this item?',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Current')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+      ],
+    ),
+  );
+
+  if (confirmed == true) {
+    i.terms = updatedTerms;
+    await s.update();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Warranty updated to brand policy.')),
+      );
+    }
+  }
 }

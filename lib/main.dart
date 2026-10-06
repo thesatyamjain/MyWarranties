@@ -899,10 +899,20 @@ class Detail extends StatelessWidget {
             const SizedBox(height: 6),
             Text('Starts ${s.formatDate(i.start)} (${i.basis.toLowerCase()}). Terms and conditions may apply.',
                 style: t.bodySmall),
-            TextButton(
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
-                onPressed: () => showStartSheet(context, s, i),
-                child: const Text('Change start date')),
+            Row(
+              children: [
+                TextButton(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
+                    onPressed: () => showStartSheet(context, s, i),
+                    child: const Text('Change start date')),
+                const SizedBox(width: 16),
+                TextButton.icon(
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
+                    onPressed: () => recheckWarrantyPolicy(context, s, i),
+                    icon: const Icon(CupertinoIcons.sparkles, size: 14),
+                    label: const Text('Sync with Brand Policy')),
+              ],
+            ),
           ]),
         ),
         const SizedBox(height: 20),
