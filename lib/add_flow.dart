@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -548,6 +549,9 @@ class _Row {
   List<Term> terms = [];
   bool confirmedEstimate = true;
   double conf = 1;
+  bool isSearchingWarranty = false;
+  String? aiSummary;
+  String? searchError;
   bool get needsConfirm => false;
 }
 
@@ -589,30 +593,98 @@ class _ReviewState extends State<ReviewScreen> {
           ..price.text = '${i['price'] ?? ''}'
           ..conf = manual ? 1 : (i['confidence'] as num?)?.toDouble() ?? 0
           ..category = guessCategory('${i['product_name'] ?? ''}')
-          ..terms = resolveWarranty(
-              name: '${i['product_name'] ?? ''}',
-              brand: '${i['brand'] ?? ''}',
-              category: guessCategory('${i['product_name'] ?? ''}'),
-              printed: i['printed_warranty'] as String?,
-              aiTerms: [
-                for (final t in (i['standard_warranty_terms'] as List? ?? []))
-                  if (t is Map && t['label'] != null && t['months'] != null)
-                    Term(
-                      '${t['label']}',
-                      (t['months'] as num).toInt(),
-                      t['source'] == 'bill'
-                          ? TermSource.bill
-                          : (t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand),
-                    ),
-              ])
+          ..aiSummary = (i['warranty_summary'] as String?)?.isNotEmpty == true
+              ? i['warranty_summary'] as String
+              : null
+          ..terms = [
+            for (final t in (i['standard_warranty_terms'] as List? ?? []))
+              if (t is Map && t['label'] != null && t['months'] != null)
+                Term(
+                  '${t['label']}',
+                  (t['months'] as num).toInt(),
+                  t['source'] == 'bill'
+                      ? TermSource.bill
+                      : (t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand),
+                ),
+            if ((i['standard_warranty_terms'] as List? ?? []).isEmpty)
+              ...parsePrinted(i['printed_warranty'] as String?),
+          ]
     ];
+    if (rows.isEmpty) {
+      rows.add(_Row());
+    }
+
+    // Auto-search via AI for products that don't yet have verified terms from bill/AI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoSearchWarranties();
+    });
+  }
+
+  void _autoSearchWarranties() {
     for (final r in rows) {
-      if (r.terms.isEmpty) {
-        r.terms.add(Term('Product', 12, TermSource.brand));
+      if (r.terms.isEmpty &&
+          (r.name.text.trim().isNotEmpty || r.brand.text.trim().isNotEmpty)) {
+        _searchRowWarranty(r);
       }
     }
-    if (rows.isEmpty) {
-      rows.add(_Row()..terms.add(Term('Product', 12, TermSource.brand)));
+  }
+
+  Future<void> _searchRowWarranty(_Row r) async {
+    final name = r.name.text.trim();
+    final brand = r.brand.text.trim();
+    final model = r.model.text.trim();
+    if (name.isEmpty && brand.isEmpty) {
+      setState(() {
+        r.searchError = 'Enter product name or brand to search official warranty.';
+      });
+      return;
+    }
+
+    setState(() {
+      r.isSearchingWarranty = true;
+      r.searchError = null;
+    });
+
+    try {
+      final res = await queryProductWarrantyPolicy(
+        productName: name,
+        brand: brand,
+        model: model,
+        seller: seller.text.trim(),
+        apiKey: widget.store.userApiKey,
+      );
+      if (mounted) {
+        setState(() {
+          if (res.terms.isNotEmpty) {
+            r.terms = res.terms.map((t) {
+              final label = (t['label'] ?? 'Product').toString();
+              final months = (t['months'] as num?)?.toInt() ?? 12;
+              return Term(label, months, TermSource.brand);
+            }).toList();
+          }
+          r.aiSummary = res.summary.isNotEmpty ? res.summary : null;
+          r.isSearchingWarranty = false;
+          r.searchError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          r.isSearchingWarranty = false;
+          final cleanErr = e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', '');
+          r.searchError = 'AI search note: $cleanErr';
+          if (r.terms.isEmpty) {
+            final fallback = resolveWarranty(
+              name: name,
+              brand: brand,
+              category: r.category,
+            );
+            if (fallback.isNotEmpty) {
+              r.terms = fallback;
+            }
+          }
+        });
+      }
     }
   }
 
@@ -624,7 +696,7 @@ class _ReviewState extends State<ReviewScreen> {
       seller.text.trim().isNotEmpty &&
       rows.any((r) => r.track) &&
       rows.where((r) => r.track).every((r) =>
-          r.name.text.trim().isNotEmpty && r.terms.isNotEmpty);
+          r.name.text.trim().isNotEmpty && r.terms.isNotEmpty && !r.isSearchingWarranty);
 
   Future<void> _save() async {
     setState(() => saving = true);
@@ -652,7 +724,11 @@ class _ReviewState extends State<ReviewScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: FilledButton(
               onPressed: canSave ? _save : null,
-              child: Text(saving ? 'Saving' : 'Save and start countdown')),
+              child: Text(saving
+                  ? 'Saving'
+                  : (rows.any((r) => r.track && r.isSearchingWarranty)
+                      ? 'AI searching warranty...'
+                      : 'Save and start countdown'))),
         ),
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 24), children: [
@@ -675,7 +751,29 @@ class _ReviewState extends State<ReviewScreen> {
         const SizedBox(height: 12),
         Text('Products on this bill', style: t.titleMedium),
         const SizedBox(height: 8),
-        for (final r in rows) _ItemCard(r, onChanged: () => setState(() {})),
+        for (final r in rows)
+          _ItemCard(
+            r,
+            onChanged: () => setState(() {}),
+            onSearchWarranty: _searchRowWarranty,
+            onRemove: rows.length > 1 ? () => setState(() => rows.remove(r)) : null,
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: OutlinedButton.icon(
+            onPressed: () {
+              setState(() {
+                rows.add(_Row());
+              });
+            },
+            icon: const Icon(CupertinoIcons.plus, size: 16),
+            label: const Text('Add another product to this bill'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Pal.ink,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Pal.r)),
+            ),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Wrap(
@@ -740,7 +838,8 @@ class _Field extends StatelessWidget {
   final double conf;
   final bool number;
   final VoidCallback? onChanged;
-  const _Field(this.label, this.c, this.conf, {this.number = false, this.onChanged});
+  final ValueChanged<String>? onSubmitted;
+  const _Field(this.label, this.c, this.conf, {this.number = false, this.onChanged, this.onSubmitted});
   @override
   Widget build(BuildContext context) {
     final low = conf < 0.8;
@@ -749,6 +848,7 @@ class _Field extends StatelessWidget {
       child: TextField(
         controller: c,
         onChanged: (_) => onChanged?.call(),
+        onSubmitted: onSubmitted,
         keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : null,
         decoration: lowDecoration(label, low),
       ),
@@ -813,17 +913,43 @@ class _DateField extends StatelessWidget {
 class _ItemCard extends StatefulWidget {
   final _Row r;
   final VoidCallback onChanged;
-  const _ItemCard(this.r, {required this.onChanged});
+  final Future<void> Function(_Row) onSearchWarranty;
+  final VoidCallback? onRemove;
+  const _ItemCard(
+    this.r, {
+    required this.onChanged,
+    required this.onSearchWarranty,
+    this.onRemove,
+  });
   @override
   State<_ItemCard> createState() => _ItemCardState();
 }
 
 class _ItemCardState extends State<_ItemCard> {
   _Row get r => widget.r;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   void _changed() {
     widget.onChanged();
     setState(() {});
+  }
+
+  void _onNameOrBrandChanged() {
+    _changed();
+    if (r.terms.isEmpty && (r.name.text.trim().length >= 3 || r.brand.text.trim().length >= 3)) {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 1400), () {
+        if (mounted && r.terms.isEmpty && !r.isSearchingWarranty) {
+          widget.onSearchWarranty(r);
+        }
+      });
+    }
   }
 
   @override
@@ -895,43 +1021,236 @@ class _ItemCardState extends State<_ItemCard> {
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Pal.muted),
               ),
             ),
+          if (widget.onRemove != null)
+            IconButton(
+              icon: const Icon(CupertinoIcons.trash, size: 16, color: Pal.muted),
+              tooltip: 'Remove product from bill',
+              onPressed: widget.onRemove,
+            ),
         ]),
         if (r.track) ...[
-          _Field('Product name', r.name, r.conf, onChanged: _changed),
+          _Field('Product name', r.name, r.conf,
+              onChanged: _onNameOrBrandChanged,
+              onSubmitted: (_) {
+                _debounce?.cancel();
+                widget.onSearchWarranty(r);
+              }),
           Row(children: [
-            Expanded(child: _Field('Brand', r.brand, r.conf)),
+            Expanded(
+              child: _Field('Brand', r.brand, r.conf,
+                  onChanged: _onNameOrBrandChanged,
+                  onSubmitted: (_) {
+                    _debounce?.cancel();
+                    widget.onSearchWarranty(r);
+                  }),
+            ),
             const SizedBox(width: 10),
-            Expanded(child: _Field('Model', r.model, r.conf)),
+            Expanded(
+              child: _Field('Model', r.model, r.conf,
+                  onChanged: _changed,
+                  onSubmitted: (_) {
+                    _debounce?.cancel();
+                    widget.onSearchWarranty(r);
+                  }),
+            ),
           ]),
           _Field('Serial / IMEI (optional)', r.serial, 1),
-          Text('Warranty', style: t.titleSmall),
-          const SizedBox(height: 6),
-          if (r.terms.isEmpty)
-            Text('We could not find a period. Add one below.', style: t.bodyMedium),
-          for (final term in r.terms) _TermRow(term, onChanged: () {
-            r.confirmedEstimate = false;
-            _changed();
-          }, onRemove: () {
-            r.terms.remove(term);
-            _changed();
-          }),
-          PopupMenuButton<String>(
-              onSelected: (label) {
-                r.terms.add(Term(label, 12, TermSource.manual));
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text('Warranty Period', style: t.titleSmall),
+              const Spacer(),
+              if (r.terms.isNotEmpty && r.aiSummary != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Pal.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified, size: 13, color: Pal.green),
+                      SizedBox(width: 4),
+                      Text(
+                        'AI Verified',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Pal.green),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // 1. Loading state
+          if (r.isSearchingWarranty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Pal.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(Pal.r),
+                border: Border.all(color: Pal.blue.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Pal.blue),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'AI searching official manufacturer warranty for ${r.name.text.trim().isNotEmpty ? r.name.text.trim() : "product"}...',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pal.blue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // 2. AI Summary Card (when found)
+          if (!r.isSearchingWarranty && r.aiSummary != null && r.aiSummary!.trim().isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Pal.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(Pal.r),
+                border: Border.all(color: Pal.green.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.verified_outlined, size: 16, color: Pal.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Manufacturer Policy (AI Discovered):',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Pal.green),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          r.aiSummary!,
+                          style: const TextStyle(fontSize: 12, color: Pal.ink, height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // 3. Search Error / Notice
+          if (!r.isSearchingWarranty && r.searchError != null && r.searchError!.trim().isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Pal.amberBg,
+                borderRadius: BorderRadius.circular(Pal.r),
+                border: Border.all(color: Pal.amber.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Pal.amber),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      r.searchError!,
+                      style: const TextStyle(fontSize: 12, color: Pal.ink, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // 4. Empty Terms Prompt
+          if (!r.isSearchingWarranty && r.terms.isEmpty)
+            const Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'No preset warranty applied. Tap "AI Search Warranty" to discover official manufacturer coverage, or add terms manually.',
+                style: TextStyle(fontSize: 12, color: Pal.muted, height: 1.3),
+              ),
+            ),
+
+          // 5. Existing Terms list
+          for (final term in r.terms)
+            _TermRow(
+              term,
+              onChanged: () {
+                r.confirmedEstimate = false;
                 _changed();
               },
-              itemBuilder: (_) => [
-                    for (final l in ['Extended warranty', 'AMC', 'Component', 'Product'])
-                      PopupMenuItem(value: l, child: Text(l)),
-                  ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(CupertinoIcons.add, size: 18, color: Pal.blue),
-                  const SizedBox(width: 6),
-                  Text('Add warranty term', style: const TextStyle(color: Pal.blue)),
-                ]),
-              )),
+              onRemove: () {
+                r.terms.remove(term);
+                _changed();
+              },
+            ),
+
+          const SizedBox(height: 4),
+
+          // 6. Action buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: r.isSearchingWarranty
+                    ? null
+                    : () {
+                        _debounce?.cancel();
+                        widget.onSearchWarranty(r);
+                      },
+                icon: r.isSearchingWarranty
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(CupertinoIcons.sparkles, size: 15, color: Pal.blue),
+                label: Text(
+                  r.terms.isEmpty ? 'AI Search Warranty' : 'Re-check AI Warranty',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pal.blue),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Pal.blue.withValues(alpha: 0.1),
+                  foregroundColor: Pal.blue,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (label) {
+                  r.terms.add(Term(label, 12, TermSource.manual));
+                  _changed();
+                },
+                itemBuilder: (_) => [
+                  for (final l in ['Extended warranty', 'AMC', 'Component', 'Product'])
+                    PopupMenuItem(value: l, child: Text(l)),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(CupertinoIcons.add, size: 15, color: Pal.muted),
+                      const SizedBox(width: 4),
+                      const Text('Add manual term', style: TextStyle(color: Pal.muted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ]),
     );

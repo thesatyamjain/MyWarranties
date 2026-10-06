@@ -32,4 +32,9 @@ void main() {
     expect(at(30).status, WStatus.expiringSoon);
     expect(at(-5).status, WStatus.expired);
   });
+
+  test('products without explicit terms start empty for AI search, not hardcoded presets', () {
+    final terms = resolveWarranty(name: 'Custom Product', brand: 'Generic', category: 'Other');
+    expect(terms, isEmpty);
+  });
 }
