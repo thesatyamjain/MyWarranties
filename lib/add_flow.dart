@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'dart:io';
@@ -5,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'extractor.dart';
@@ -17,58 +19,424 @@ import 'theme.dart';
 Future<void> startAddFlow(BuildContext context, Store store) async {
   final src = await showModalBottomSheet<String>(
     context: context,
-    backgroundColor: Pal.paper,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Pal.r))),
-    builder: (_) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Add a bill', style: Theme.of(context).textTheme.headlineSmall)),
-          const SizedBox(height: 4),
-          Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Lay it flat in good light. Include the full bill.',
-                  style: Theme.of(context).textTheme.bodyMedium)),
-          const SizedBox(height: 12),
-          for (final o in const [
-            ('camera', CupertinoIcons.camera, 'Scan with camera'),
-            ('gallery', CupertinoIcons.photo, 'Choose from gallery'),
-            ('multi', CupertinoIcons.photo_on_rectangle, 'Add several bills at once'),
-            ('pdf', CupertinoIcons.doc_richtext, 'Import a PDF'),
-          ])
-            ListTile(
-                leading: Icon(o.$2),
-                title: Text(o.$3),
-                onTap: () => Navigator.pop(context, o.$1)),
-        ]),
-      ),
-    ),
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (_) => const _AddBillSheet(),
   );
   if (src == null || !context.mounted) return;
+
+  if (src == 'manual') {
+    final tempDir = await getTemporaryDirectory();
+    final placeholder = File('${tempDir.path}/manual_bill_placeholder.jpg');
+    if (!await placeholder.exists()) {
+      final jpgBytes = base64Decode(
+          '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=');
+      await placeholder.writeAsBytes(jpgBytes);
+    }
+    if (!context.mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          store: store,
+          file: placeholder,
+          ex: Extraction({'items': [{}]}),
+        ),
+      ),
+    );
+    return;
+  }
+
   final picker = ImagePicker();
-  // maxWidth keeps uploads small for low-end phones and 4G (image compression).
   final List<String> paths;
   if (src == 'pdf') {
     final r = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf']);
     paths = [for (final f in r) if (f.path != null) f.path!];
-  } else if (src == 'multi') {
-    paths = [for (final x in await picker.pickMultiImage(maxWidth: 1800, imageQuality: 80)) x.path];
+  } else if (src == 'gallery') {
+    final multi = await picker.pickMultiImage(maxWidth: 1800, imageQuality: 80);
+    paths = [for (final x in multi) x.path];
   } else {
     final x = await picker.pickImage(
-        source: src == 'camera' ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1800,
-        imageQuality: 80);
+      source: ImageSource.camera,
+      maxWidth: 1800,
+      imageQuality: 80,
+    );
     paths = [if (x != null) x.path];
   }
-  // Bulk: each bill goes through processing and review in turn.
-  // ponytail: sequential; backing out of one bill moves to the next.
+
   for (final p in paths) {
     if (!context.mounted) return;
-    await Navigator.push(context,
-        MaterialPageRoute(builder: (_) => ProcessingScreen(store: store, file: File(p))));
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProcessingScreen(store: store, file: File(p)),
+      ),
+    );
+  }
+}
+
+class _AddBillSheet extends StatelessWidget {
+  const _AddBillSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Pal.paper,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle pill
+          Center(
+            child: Container(
+              width: 36,
+              height: 4.5,
+              decoration: BoxDecoration(
+                color: Pal.line.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header with title and dismiss button
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add a Bill',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        height: 1.1,
+                        color: Pal.ink,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Instant AI extraction from photos, PDFs, or manual entry.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Pal.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Semantics(
+                label: 'Close',
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Pal.line.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(CupertinoIcons.xmark, size: 13, color: Pal.muted),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 1. Hero Primary Action: Camera Scanner
+          _BentoTile(
+            title: 'Scan with Camera',
+            subtitle: 'Auto-detects seller, dates, amounts & warranty',
+            badge: 'Instant AI',
+            icon: CupertinoIcons.camera_fill,
+            iconBg: Pal.blue.withValues(alpha: 0.12),
+            iconColor: Pal.blue,
+            onTap: () => Navigator.pop(context, 'camera'),
+          ),
+          const SizedBox(height: 12),
+
+          // 2. Secondary Bento Grid (Gallery & PDF)
+          Row(
+            children: [
+              Expanded(
+                child: _BentoSquareTile(
+                  title: 'Photo Library',
+                  subtitle: 'Single or batch images',
+                  icon: CupertinoIcons.photo_on_rectangle,
+                  iconBg: const Color(0xFF5856D6).withValues(alpha: 0.12),
+                  iconColor: const Color(0xFF5856D6),
+                  onTap: () => Navigator.pop(context, 'gallery'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BentoSquareTile(
+                  title: 'Files & PDF',
+                  subtitle: 'Invoices & e-receipts',
+                  icon: CupertinoIcons.doc_text_fill,
+                  iconBg: const Color(0xFF0071A4).withValues(alpha: 0.12),
+                  iconColor: const Color(0xFF0071A4),
+                  onTap: () => Navigator.pop(context, 'pdf'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Tertiary Action: Direct Manual Entry
+          Material(
+            color: Pal.card,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: () => Navigator.pop(context, 'manual'),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Pal.line.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(CupertinoIcons.square_pencil, size: 16, color: Pal.ink),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Enter details manually',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Pal.ink,
+                            ),
+                          ),
+                          Text(
+                            'Type product info without a bill',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Pal.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      CupertinoIcons.chevron_forward,
+                      size: 14,
+                      color: Pal.muted.withValues(alpha: 0.6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BentoTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String badge;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _BentoTile({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Pal.card,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 22, color: iconColor),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: Pal.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: iconBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: iconColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 12, color: Pal.muted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_forward,
+                size: 15,
+                color: Pal.muted.withValues(alpha: 0.6),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BentoSquareTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _BentoSquareTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Pal.card,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                  color: Pal.ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11.5, color: Pal.muted),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
