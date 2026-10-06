@@ -1345,10 +1345,9 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 28),
-      Text('Backup and sync', style: t.titleSmall),
+      Text('Backup & Data Protection', style: t.titleSmall),
       const SizedBox(height: 4),
-      // ponytail: cloud backup (FR-27) pending Firebase project config.
-      Text('Cloud backup is not on yet. Your bills are stored on this phone only.',
+      Text('Android Auto-Backup is active. Your warranties and bills back up with your Google account when device backup is enabled.',
           style: t.bodyMedium),
       const SizedBox(height: 28),
       OutlinedButton(

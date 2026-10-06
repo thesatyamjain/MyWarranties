@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Include SharedPreferences (warranties list, settings, API keys) -->
+        <include domain="sharedpref" path="." />
+        <!-- Include permanent saved receipt/bill images in documents directory -->
+        <include domain="file" path="." />
+        <!-- Exclude temporary / cache files -->
+        <exclude domain="file" path="cache" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+        <include domain="file" path="." />
+    </device-transfer>
+</data-extraction-rules>

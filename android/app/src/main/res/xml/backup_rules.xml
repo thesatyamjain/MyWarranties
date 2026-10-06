@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Include SharedPreferences (warranties list, settings, API keys) -->
+    <include domain="sharedpref" path="." />
+    <!-- Include permanent saved receipt/bill images in documents directory -->
+    <include domain="file" path="." />
+    <!-- Exclude cache / temporary files -->
+    <exclude domain="file" path="cache" />
+</full-backup-content>
