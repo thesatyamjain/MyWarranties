@@ -58,8 +58,54 @@ abstract class BillExtractor {
 class DefaultBillExtractor implements BillExtractor {
   const DefaultBillExtractor();
 
-  Future<http.Response> _postExtraction(String key, File file, String model) async {
-    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key');
+  static String? _cachedWorkingModel;
+  static String _cachedApiVer = 'v1beta';
+
+  Future<List<String>> _discoverModels(String key) async {
+    for (final ver in ['v1beta', 'v1']) {
+      try {
+        final client = http.Client();
+        final res = await client
+            .get(
+              Uri.parse('https://generativelanguage.googleapis.com/$ver/models?key=$key'),
+              headers: {'x-goog-api-key': key, 'Connection': 'close'},
+            )
+            .timeout(const Duration(seconds: 8));
+        client.close();
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          final models = data['models'] as List? ?? [];
+          final supported = <String>[];
+          for (final m in models) {
+            final methods = m['supportedGenerationMethods'] as List? ?? [];
+            if (methods.contains('generateContent')) {
+              final name = (m['name'] as String? ?? '').replaceFirst('models/', '');
+              if (name.isNotEmpty) supported.add(name);
+            }
+          }
+          if (supported.isNotEmpty) {
+            _cachedApiVer = ver;
+            return supported;
+          }
+        }
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  String _parseErrorDetail(http.Response res) {
+    try {
+      final j = jsonDecode(res.body);
+      if (j is Map && j['error'] is Map) {
+        final msg = j['error']['message']?.toString();
+        if (msg != null && msg.trim().isNotEmpty) return msg.trim();
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  Future<http.Response> _postExtraction(String key, File file, String model, {String apiVer = 'v1beta'}) async {
+    final uri = Uri.parse('https://generativelanguage.googleapis.com/$apiVer/models/$model:generateContent?key=$key');
     final bytes = await file.readAsBytes();
     final mime = file.path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
     final payload = jsonEncode({
@@ -125,29 +171,63 @@ class DefaultBillExtractor implements BillExtractor {
       throw StateError('Missing Gemini API Key. Open Settings > Gemini AI Configuration to enter your key.');
     }
 
-    const candidateModels = [
+    // Build model list: cached first, followed by standard fallback candidates
+    final candidateModels = <String>{
+      if (_cachedWorkingModel != null) _cachedWorkingModel!,
+      'gemini-2.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-2.5-flash',
-    ];
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash-8b',
+      'gemini-1.5-pro',
+    }.toList();
 
     try {
       http.Response? res;
-      for (final m in candidateModels) {
-        res = await _postExtraction(effectiveKey, file, m);
-        if (res.statusCode != 404) break;
-      }
-      res ??= await _postExtraction(effectiveKey, file, candidateModels.first);
 
+      // Try candidate models with current API version and v1/v1beta fallbacks
+      for (final m in candidateModels) {
+        for (final ver in [_cachedApiVer, _cachedApiVer == 'v1beta' ? 'v1' : 'v1beta']) {
+          res = await _postExtraction(effectiveKey, file, m, apiVer: ver);
+          if (res.statusCode == 200) {
+            _cachedWorkingModel = m;
+            _cachedApiVer = ver;
+            break;
+          }
+          if (res.statusCode != 404) break;
+        }
+        if (res?.statusCode == 200) break;
+      }
+
+      // If all hardcoded candidates failed with 404, dynamically query what models are enabled on this key
+      if (res == null || res.statusCode == 404) {
+        final discovered = await _discoverModels(effectiveKey);
+        for (final m in discovered) {
+          if (candidateModels.contains(m)) continue;
+          res = await _postExtraction(effectiveKey, file, m, apiVer: _cachedApiVer);
+          if (res.statusCode == 200) {
+            _cachedWorkingModel = m;
+            break;
+          }
+        }
+      }
+
+      res ??= await _postExtraction(effectiveKey, file, candidateModels.first, apiVer: _cachedApiVer);
+
+      final detail = _parseErrorDetail(res);
       if (res.statusCode == 400 || res.statusCode == 403) {
-        throw StateError('Invalid Gemini API Key or permission denied. Please verify your key in Settings.');
+        throw StateError(detail.isNotEmpty
+            ? detail
+            : 'Invalid Gemini API Key or permission denied. Please verify your key in Settings.');
       } else if (res.statusCode == 404) {
-        throw StateError('Gemini model unavailable (404). Please verify your API key in Settings.');
+        throw StateError(detail.isNotEmpty
+            ? detail
+            : 'Gemini model unavailable (404). Please ensure the Generative Language API is enabled for your key.');
       } else if (res.statusCode == 429) {
         throw StateError('Gemini API rate limit or quota exceeded. Please try again shortly.');
       } else if (res.statusCode != 200) {
-        throw HttpException('Gemini error (${res.statusCode})');
+        throw HttpException(detail.isNotEmpty ? detail : 'Gemini error (${res.statusCode})');
       }
 
       final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];

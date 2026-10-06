@@ -137,6 +137,7 @@ class Glass extends StatelessWidget {
   final double radius;
   final EdgeInsetsGeometry padding;
   final double blur;
+  final bool showShadow;
 
   const Glass({
     super.key,
@@ -144,6 +145,7 @@ class Glass extends StatelessWidget {
     this.radius = 28,
     this.padding = EdgeInsets.zero,
     this.blur = 28.0,
+    this.showShadow = true,
   });
 
   @override
@@ -152,21 +154,23 @@ class Glass extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: r,
-        boxShadow: [
-          // Soft ambient floor shadow
-          BoxShadow(
-            color: const Color(0xFF001133).withValues(alpha: 0.08),
-            blurRadius: 36,
-            spreadRadius: -4,
-            offset: const Offset(0, 14),
-          ),
-          // Tight contact shadow for floating separation
-          BoxShadow(
-            color: const Color(0xFF000000).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: showShadow
+            ? [
+                // Soft ambient floor shadow
+                BoxShadow(
+                  color: const Color(0xFF001133).withValues(alpha: 0.08),
+                  blurRadius: 36,
+                  spreadRadius: -4,
+                  offset: const Offset(0, 14),
+                ),
+                // Tight contact shadow for floating separation
+                BoxShadow(
+                  color: const Color(0xFF000000).withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: ClipRRect(
         borderRadius: r,

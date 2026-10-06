@@ -143,6 +143,7 @@ class _ShellState extends State<Shell> {
                     child: const Glass(
                       radius: 22,
                       blur: 20,
+                      showShadow: false,
                       child: SizedBox(
                         width: 44,
                         height: 44,
