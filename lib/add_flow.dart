@@ -665,6 +665,7 @@ class _ReviewState extends State<ReviewScreen> {
         _Field('Seller', seller, conf['seller']!, onChanged: () => setState(() {})),
         _Field('Invoice number', invoice, conf['invoice_no']!, onChanged: () => setState(() {})),
         _DateField(
+            store: widget.store,
             date: date,
             conf: conf['purchase_date']!,
             issue: dateIssue,
@@ -730,11 +731,12 @@ InputDecoration lowDecoration(String label, bool low) => InputDecoration(
     );
 
 class _DateField extends StatelessWidget {
+  final Store store;
   final DateTime? date;
   final double conf;
   final String? issue;
   final ValueChanged<DateTime> onPick;
-  const _DateField({required this.date, required this.conf, required this.issue, required this.onPick});
+  const _DateField({required this.store, required this.date, required this.conf, required this.issue, required this.onPick});
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -750,13 +752,13 @@ class _DateField extends StatelessWidget {
             if (d != null) onPick(d);
           },
           child: InputDecorator(
-            decoration: lowDecoration('Purchase date (DD/MM/YY)', conf < 0.8)
+            decoration: lowDecoration('Purchase date (${store.dateFormatPattern.toUpperCase()})', conf < 0.8)
                 .copyWith(errorText: issue),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  date == null ? 'Select date (DD/MM/YY)' : DateFormat('dd/MM/yy').format(date!),
+                  date == null ? 'Select date (${store.dateFormatPattern.toUpperCase()})' : store.formatDate(date!),
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: date != null ? FontWeight.w600 : FontWeight.w400,

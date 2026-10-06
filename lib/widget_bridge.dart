@@ -10,8 +10,6 @@ import 'store.dart';
 /// Bridges Flutter state to the native Android AppWidget without heavy plugins.
 class WidgetBridge {
   static const _channel = MethodChannel('com.satyam.my_warranties/widget');
-  static final _date = DateFormat('dd/MM/yy');
-
   static Future<void> sync(Store store) async {
     if (kIsWeb || !Platform.isAndroid) return;
     try {
@@ -22,7 +20,7 @@ class WidgetBridge {
       String nextSubtitle = '';
       if (next != null && next.endDate != null) {
         final brandPrefix = next.brand.isNotEmpty ? '${next.brand} · ' : '';
-        nextSubtitle = '${brandPrefix}Ends ${_date.format(next.endDate!)}';
+        nextSubtitle = '${brandPrefix}Ends ${store.formatDate(next.endDate!)}';
       }
 
       await _channel.invokeMethod('updateWidgetData', {

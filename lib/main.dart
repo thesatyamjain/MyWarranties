@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'add_flow.dart';
 import 'detail_tools.dart';
@@ -57,7 +58,6 @@ class App extends StatelessWidget {
       );
 }
 
-final _date = DateFormat('dd/MM/yy');
 
 // ---------- 1. Onboarding ----------
 class Onboarding extends StatelessWidget {
@@ -285,44 +285,82 @@ class Home extends StatelessWidget {
   final Store s;
   final VoidCallback onLibrary;
   const Home(this.s, {super.key, required this.onLibrary});
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final live = s.items.where((i) => i.status != WStatus.expired).toList()
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     final soon = live.where((i) => i.status == WStatus.expiringSoon).toList();
-    final recent = s.items.reversed.take(3).toList();
+    final expired = s.items.where((i) => i.status == WStatus.expired).toList();
+    final recent = s.items.reversed.take(4).toList();
+    final next = live.firstOrNull;
+
+    // Categories breakdown
+    final catCounts = <String, int>{};
+    for (final it in s.items) {
+      if (it.category.isNotEmpty) {
+        catCounts[it.category] = (catCounts[it.category] ?? 0) + 1;
+      }
+    }
+
     if (s.items.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(CupertinoIcons.doc_text, size: 48, color: Pal.muted),
-            const SizedBox(height: 16),
-            Text('No warranties yet', style: t.headlineSmall),
-            const SizedBox(height: 6),
-            Text('Add your first bill. It takes about 30 seconds.',
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 18,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(CupertinoIcons.shield_lefthalf_fill, size: 36, color: Pal.blue),
+            ),
+            const SizedBox(height: 20),
+            Text('Warranty Vault Empty', style: t.headlineSmall),
+            const SizedBox(height: 8),
+            Text('Snap a receipt or bill. We will automatically track its expiry and notify you.',
                 textAlign: TextAlign.center, style: t.bodyMedium),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             AppleBounce(
               onTap: () => startAddFlow(context, s),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   color: Pal.blue,
                   borderRadius: BorderRadius.circular(Pal.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Pal.blue.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 18),
                     SizedBox(width: 8),
-                    Text(
-                      'Scan Bill',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                    Flexible(
+                      child: Text(
+                        'Scan Your First Bill',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ],
@@ -333,22 +371,312 @@ class Home extends StatelessWidget {
         ),
       );
     }
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 96), children: [
-      Text('${live.length} active', style: t.headlineMedium?.copyWith(fontSize: 34)),
-      Text(soon.isEmpty ? 'Nothing expires in the next 30 days.' : '${soon.length} expiring within 30 days.',
-          style: t.bodyMedium),
-      const SizedBox(height: 28),
-      if (soon.isNotEmpty) ...[
-        Text('Expiring soon', style: t.titleMedium),
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+      children: [
+        // 1. Vault Header Card (Hero)
+        AppleBounce(
+          scaleFactor: 0.98,
+          onTap: onLibrary,
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF102820), Color(0xFF0A1B15)],
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F241D).withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(CupertinoIcons.shield_fill, color: Color(0xFF6EE7B7), size: 17),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'WARRANTY VAULT',
+                          style: TextStyle(
+                            color: Color(0xFF6EE7B7),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.1,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${s.items.length} Total',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  soon.isNotEmpty
+                      ? '${soon.length} Expiring Soon'
+                      : (live.isNotEmpty ? 'All Warranties Protected' : 'All Expired'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  next != null
+                      ? 'Next: ${next.name} (${countdown(next.daysLeft)})'
+                      : 'No active warranties right now.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // 2. Bento Quick Metrics Grid (2 columns)
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: cardDecoration,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: Pal.greenBg,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(CupertinoIcons.checkmark_shield_fill, color: Pal.green, size: 18),
+                        ),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Pal.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${live.length}',
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Active Coverages', style: TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: cardDecoration,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: soon.isNotEmpty ? Pal.amberBg : (expired.isNotEmpty ? Pal.brickBg : Pal.greenBg),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            soon.isNotEmpty ? CupertinoIcons.clock_fill : (expired.isNotEmpty ? CupertinoIcons.archivebox_fill : CupertinoIcons.check_mark),
+                            color: soon.isNotEmpty ? Pal.amber : (expired.isNotEmpty ? Pal.brick : Pal.green),
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      soon.isNotEmpty ? '${soon.length}' : (expired.isNotEmpty ? '${expired.length}' : '0'),
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      soon.isNotEmpty ? 'Within 30 Days' : (expired.isNotEmpty ? 'Expired Total' : 'Action Needed'),
+                      style: const TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // 3. Category Distribution Bar (if categories exist)
+        if (catCounts.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Categories in Vault', style: t.titleSmall),
+              Text('${catCounts.length} types', style: const TextStyle(color: Pal.muted, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final entry in catCounts.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _categoryIcon(entry.key),
+                            size: 14,
+                            color: Pal.blue,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            entry.key,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Pal.paper,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${entry.value}',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Pal.muted),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+
+        // 4. Urgent Expirations Section (if any)
+        if (soon.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: Pal.amber, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Text('Expiring Soon', style: t.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final i in soon) ItemTile(s, i),
+        ],
+
+        // 5. Recently Added Feed
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Recent Warranties', style: t.titleSmall),
+            TextButton(
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+              onPressed: onLibrary,
+              child: const Row(
+                children: [
+                  Text('See all', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  SizedBox(width: 2),
+                  Icon(CupertinoIcons.chevron_right, size: 12),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
-        for (final i in soon) ItemTile(s, i),
-        const SizedBox(height: 20),
+        for (final i in recent) ItemTile(s, i),
       ],
-      Text('Recently added', style: t.titleMedium),
-      const SizedBox(height: 10),
-      for (final i in recent) ItemTile(s, i),
-      TextButton(onPressed: onLibrary, child: const Text('See all in library')),
-    ]);
+    );
+  }
+
+  static IconData _categoryIcon(String cat) {
+    final lower = cat.toLowerCase();
+    if (lower.contains('elect') || lower.contains('phone') || lower.contains('laptop') || lower.contains('audio') || lower.contains('headphone')) {
+      return CupertinoIcons.device_phone_portrait;
+    }
+    if (lower.contains('appliance') || lower.contains('fridge') || lower.contains('tv') || lower.contains('ac')) {
+      return CupertinoIcons.tv;
+    }
+    if (lower.contains('power') || lower.contains('battery')) {
+      return CupertinoIcons.bolt_fill;
+    }
+    if (lower.contains('watch') || lower.contains('wear')) {
+      return CupertinoIcons.stopwatch;
+    }
+    if (lower.contains('vehicle') || lower.contains('auto') || lower.contains('car')) {
+      return CupertinoIcons.car_detailed;
+    }
+    return CupertinoIcons.cube_box_fill;
   }
 }
 
@@ -375,6 +703,7 @@ class ItemTile extends StatelessWidget {
   final Store s;
   final Item i;
   const ItemTile(this.s, this.i, {super.key});
+
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
@@ -386,18 +715,34 @@ class ItemTile extends StatelessWidget {
             decoration: cardDecoration,
             padding: const EdgeInsets.all(16),
             child: Row(children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Pal.paper,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Icon(
+                    Home._categoryIcon(i.category),
+                    color: Pal.blue,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(i.name,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15)),
                   const SizedBox(height: 2),
                   Text(
-                      [i.brand, 'Ends ${_date.format(i.endDate!)}']
+                      [i.brand, 'Ends ${s.formatDate(i.endDate!)}']
                           .where((e) => e.isNotEmpty)
                           .join('  ·  '),
-                      style: Theme.of(context).textTheme.bodySmall),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Pal.muted)),
                 ]),
               ),
               const SizedBox(width: 10),
@@ -546,14 +891,14 @@ class Detail extends StatelessWidget {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('${term.label}: ${term.months >= 12 && term.months % 12 == 0 ? '${term.months ~/ 12} yr' : '${term.months} mo'}'),
-                      Text('Ends ${_date.format(i.endOf(term))}', style: t.bodySmall),
+                      Text('Ends ${s.formatDate(i.endOf(term))}', style: t.bodySmall),
                     ]),
                   ),
                   SourceChip(term.source),
                 ]),
               ),
             const SizedBox(height: 6),
-            Text('Starts ${_date.format(i.start)} (${i.basis.toLowerCase()}). Terms and conditions may apply.',
+            Text('Starts ${s.formatDate(i.start)} (${i.basis.toLowerCase()}). Terms and conditions may apply.',
                 style: t.bodySmall),
             TextButton(
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
@@ -570,7 +915,7 @@ class Detail extends StatelessWidget {
         if (bill != null) ...[
           kv('Seller', bill.seller),
           kv('Invoice', bill.invoiceNo),
-          kv('Purchase date', _date.format(bill.purchaseDate)),
+          kv('Purchase date', s.formatDate(bill.purchaseDate)),
         ],
         const SizedBox(height: 16),
         Container(
@@ -932,6 +1277,65 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 28),
+      Text('Date Display Format', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Choose how purchase and expiry dates are formatted across the app.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      Glass(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+        child: Column(
+          children: [
+            for (final entry in indianDateFormats.entries) ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => s.setDateFormat(entry.key),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.value,
+                              style: TextStyle(
+                                fontWeight: s.dateFormatPattern == entry.key
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                fontSize: 14,
+                                color: s.dateFormatPattern == entry.key ? Pal.ink : Pal.ink.withValues(alpha: 0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Example: ${s.formatWith(DateTime.now(), entry.key)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: s.dateFormatPattern == entry.key ? Pal.blue : Pal.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (s.dateFormatPattern == entry.key)
+                        const Icon(CupertinoIcons.checkmark_alt_circle_fill,
+                            color: Pal.blue, size: 20)
+                      else
+                        Icon(CupertinoIcons.circle,
+                            color: Pal.muted.withValues(alpha: 0.4), size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              if (entry.key != indianDateFormats.keys.last)
+                const Divider(height: 1, color: Color(0x12000000)),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 28),
       Text('Backup and sync', style: t.titleSmall),
       const SizedBox(height: 4),
       // ponytail: cloud backup (FR-27) pending Firebase project config.
@@ -959,6 +1363,8 @@ class SettingsScreen extends StatelessWidget {
         },
         child: const Text('Delete all my data'),
       ),
+      const SizedBox(height: 36),
+      const BuiltByFooter(),
     ]);
   }
 
@@ -1098,3 +1504,56 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+class BuiltByFooter extends StatelessWidget {
+  const BuiltByFooter({super.key});
+
+  static const _url = 'https://thesoftwareco.pages.dev';
+
+  Future<void> _launch() async {
+    final uri = Uri.parse(_url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: AppleBounce(
+        onTap: _launch,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Built by ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Pal.muted.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const Text(
+                'The software co.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Pal.blue,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Pal.blue,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                CupertinoIcons.arrow_up_right,
+                size: 11,
+                color: Pal.blue.withValues(alpha: 0.9),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

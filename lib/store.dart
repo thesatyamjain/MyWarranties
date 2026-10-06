@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -10,6 +11,15 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'models.dart';
 import 'widget_bridge.dart';
+
+const indianDateFormats = <String, String>{
+  'dd/MM/yy': 'DD/MM/YY (Compact standard)',
+  'dd/MM/yyyy': 'DD/MM/YYYY (GST & Banking standard)',
+  'dd-MM-yyyy': 'DD-MM-YYYY (IRCTC & Govt standard)',
+  'd MMM yyyy': 'D MMM YYYY (Formal written standard)',
+  'dd MMMM yyyy': 'DD MMMM YYYY (Full month name)',
+  'yyyy-MM-dd': 'YYYY-MM-DD (ISO database format)',
+};
 
 /// Local-first store. ponytail: JSON blob in SharedPreferences is fine for
 /// hundreds of items; swap for Firestore/SQLite when cloud sync (FR-27) lands.
@@ -19,8 +29,19 @@ class Store extends ChangeNotifier {
   List<int> offsets = [30, 7, 0];
   bool onboarded = false;
   String userApiKey = '';
+  String dateFormatPattern = 'dd/MM/yy';
   late SharedPreferences _p;
   final _n = FlutterLocalNotificationsPlugin();
+
+  String formatDate(DateTime d) => DateFormat(dateFormatPattern).format(d);
+  String formatWith(DateTime d, String pattern) => DateFormat(pattern).format(d);
+
+  Future<void> setDateFormat(String pattern) async {
+    dateFormatPattern = pattern;
+    await _p.setString('date_format', pattern);
+    WidgetBridge.sync(this);
+    notifyListeners();
+  }
 
   Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -33,6 +54,7 @@ class Store extends ChangeNotifier {
     }
     onboarded = _p.getBool('onboarded') ?? false;
     userApiKey = _p.getString('gemini_api_key') ?? '';
+    dateFormatPattern = _p.getString('date_format') ?? 'dd/MM/yy';
     if (!kIsWeb) {
       _initNotifications();
     }
