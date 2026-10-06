@@ -54,9 +54,43 @@ jobs:
           elif [ "${{ github.event.inputs.bump }}" = "manual" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="${{ github.event.inputs.version }}"
           else
-            RAW_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2)
-            BASE_VER=$(echo "$RAW_VER" | cut -d '+' -f 1)
-            TAG="v$BASE_VER"
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LATEST_TAG" ]; then
+              BASE_VER="${LATEST_TAG#v}"
+            else
+              RAW_VER=$(grep '^version:' pubspec.yaml | head -n1 | cut -d ' ' -f 2)
+              BASE_VER=$(echo "$RAW_VER" | cut -d '+' -f 1)
+            fi
+
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VER"
+            MAJOR=${MAJOR:-1}
+            MINOR=${MINOR:-0}
+            PATCH=${PATCH:-0}
+
+            BUMP="${{ github.event.inputs.bump }}"
+            if [ -z "$BUMP" ]; then
+              BUMP="patch"
+            fi
+
+            case "$BUMP" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+              *)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            TAG="v$MAJOR.$MINOR.$PATCH"
           fi
           
           TAG=$(echo "$TAG" | xargs)
