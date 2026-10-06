@@ -53,7 +53,7 @@ List<Term> parsePrinted(String? text) {
   return out;
 }
 
-/// Order from the PRD: bill -> AI brand lookup -> brand+model policy -> category default -> manual.
+/// Order: bill printed text -> AI terms -> brand policy -> empty (triggers AI search).
 List<Term> resolveWarranty(
     {required String name,
     required String brand,
@@ -65,9 +65,6 @@ List<Term> resolveWarranty(
   if (aiTerms != null && aiTerms.isNotEmpty) return aiTerms;
   final brandMonths = _brandPolicy['${brand.toLowerCase()}|$category'];
   if (brandMonths != null) return [Term('Product', brandMonths, TermSource.brand)];
-  for (final e in _categories.values) {
-    if (e.$1 == category) return [Term('Product', e.$2, TermSource.estimated)];
-  }
   return [];
 }
 

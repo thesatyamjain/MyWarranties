@@ -17,10 +17,10 @@ void main() {
     expect(t.every((e) => e.source == TermSource.bill), true);
   });
 
-  test('resolver order: bill > brand > estimate > none', () {
+  test('resolver order: bill > brand > empty for AI search', () {
     expect(resolveWarranty(name: 'x', brand: 'LG', category: 'Washing machine', printed: '6 months').first.months, 6);
     expect(resolveWarranty(name: 'x', brand: 'LG', category: 'Washing machine').first.source, TermSource.brand);
-    expect(resolveWarranty(name: 'x', brand: 'Acme', category: 'TV').first.source, TermSource.estimated);
+    expect(resolveWarranty(name: 'x', brand: 'Acme', category: 'TV'), isEmpty);
     expect(resolveWarranty(name: 'x', brand: 'Acme', category: 'Other'), isEmpty);
   });
 
