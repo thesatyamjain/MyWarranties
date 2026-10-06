@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — My Warranties</title>
+  <meta name="description" content="Privacy Policy for My Warranties application detailing data practices, Google Drive scope usage, and user rights.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card-bg: rgba(20, 27, 41, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --radius: 16px;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      color: #0b0f17;
+    }
+    .logo-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    nav a:hover {
+      color: var(--text-main);
+    }
+    main {
+      flex: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      width: 100%;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.4rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    .meta-tag {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      margin: 36px 0 16px;
+      color: var(--accent);
+    }
+    p {
+      color: #cbd5e1;
+      margin-bottom: 16px;
+      font-size: 1rem;
+    }
+    ul {
+      margin: 0 0 20px 24px;
+      color: #cbd5e1;
+    }
+    li {
+      margin-bottom: 10px;
+    }
+    strong {
+      color: #f8fafc;
+    }
+    .callout {
+      background: rgba(56, 189, 248, 0.08);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 24px 0;
+    }
+    .callout p {
+      margin-bottom: 0;
+      color: #e2e8f0;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 32px 24px;
+      background: rgba(11, 15, 23, 0.9);
+      margin-top: auto;
+    }
+    .footer-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 20px;
+    }
+    .footer-links a:hover {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="logo-container">
+      <div class="logo-badge">MW</div>
+      <div class="logo-text">My Warranties</div>
+    </a>
+    <nav>
+      <a href="index.html">&larr; Back to Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Privacy Policy</h1>
+    <div class="meta-tag">
+      Last updated: October 6, 2026 &bull; Developed by The Software Labs (Satyam Jain)
+    </div>
+
+    <p>At <strong>My Warranties</strong>, your privacy is our highest priority. This policy clearly describes how the app collects, uses, handles, and protects your information.</p>
+
+    <h2>1. Offline-First Architecture</h2>
+    <p>My Warranties is built as an offline-first application. All warranty records, purchase dates, serial numbers, receipt photos, and store names that you save remain solely on your local device. We do not run proprietary databases that harvest, store, or sell your purchase receipts.</p>
+
+    <h2>2. Google Drive Backup &amp; OAuth Data Access</h2>
+    <p>You may optionally choose to connect your Google account to backup your warranties and receipt database to your personal Google Drive.</p>
+    
+    <div class="callout">
+      <p><strong>Strict Scope Usage:</strong> My Warranties uses the restricted OAuth scope <code>https://www.googleapis.com/auth/drive.file</code>. This scope grants access <em>only</em> to files and folders created specifically by the My Warranties application.</p>
+    </div>
+
+    <ul>
+      <li><strong>No Access to Private Drive Files:</strong> The app cannot view, read, modify, or delete any of your personal spreadsheets, photos, docs, or other files in Google Drive.</li>
+      <li><strong>Data Ownership:</strong> Your backup files belong entirely to you and reside within your private Google Drive storage space.</li>
+      <li><strong>Direct Communication:</strong> Authentication and backups happen directly between your device and Google's official APIs using the Google Sign-In SDK. Your credentials or tokens never pass through third-party servers.</li>
+    </ul>
+
+    <h2>3. AI Warranty &amp; Receipt Extraction</h2>
+    <p>If you choose to use the AI extraction feature to automatically read warranty periods and dates from an invoice photo, the receipt image is processed transiently via the Google Gemini API. This data is processed strictly for the purpose of identifying purchase details and is not stored or repurposed for behavioral profiling.</p>
+
+    <h2>4. Advertising and Analytics</h2>
+    <p>My Warranties contains <strong>no third-party ad networks</strong>, no tracking SDKs, and no behavioral analytics that monitor your activity across other apps or websites.</p>
+
+    <h2>5. User Data Rights &amp; Deletion</h2>
+    <ul>
+      <li>You can edit or delete any warranty or receipt at any time directly within the app.</li>
+      <li>Uninstalling the app permanently deletes all locally stored data from your device.</li>
+      <li>You can remove backups from Google Drive by deleting the app folder inside your Drive or via the App Settings page.</li>
+    </ul>
+
+    <h2>6. Contact Developer</h2>
+    <p>If you have any questions or inquiries regarding this Privacy Policy or your data protection rights, please reach out to:</p>
+    <p>
+      <strong>Developer:</strong> Satyam Jain (The Software Labs)<br>
+      <strong>Email:</strong> <a href="mailto:creativity.satyamjain@gmail.com" style="color: var(--accent); text-decoration: none;">creativity.satyamjain@gmail.com</a><br>
+      <strong>Repository:</strong> <a href="https://github.com/thesatyamjain/MyWarranties" target="_blank" style="color: var(--accent); text-decoration: none;">https://github.com/thesatyamjain/MyWarranties</a>
+    </p>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <div>&copy; 2026 The Software Labs. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="terms.html">Terms of Service</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
