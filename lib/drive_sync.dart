@@ -182,7 +182,7 @@ class DriveSyncService {
       );
     } catch (e) {
       debugPrint('Drive backup error: $e');
-      return (ok: false, message: 'Backup failed: $e', count: 0);
+      return (ok: false, message: _formatDriveError(e, 'Backup'), count: 0);
     }
   }
 
@@ -273,7 +273,18 @@ class DriveSyncService {
       );
     } catch (e) {
       debugPrint('Drive restore error: $e');
-      return (ok: false, message: 'Restore failed: $e', count: 0);
+      return (ok: false, message: _formatDriveError(e, 'Restore'), count: 0);
     }
+  }
+
+  static String _formatDriveError(dynamic e, String action) {
+    final str = e.toString();
+    if (str.contains('16') || str.contains('Cancelled by user') || str.contains('access_denied') || str.contains('403')) {
+      return '$action blocked: Google Cloud requires adding this account as a "Test user" in Google Cloud Console > OAuth consent screen (or Publish app to Production).';
+    }
+    if (str.contains('network') || str.contains('SocketException') || str.contains('Failed host lookup')) {
+      return '$action failed: Check your internet connection and try again.';
+    }
+    return '$action failed: $str';
   }
 }
