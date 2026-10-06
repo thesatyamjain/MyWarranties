@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'add_flow.dart';
 import 'detail_tools.dart';
+import 'drive_sync.dart';
 import 'extractor.dart';
 import 'models.dart';
 import 'store.dart';
@@ -1345,9 +1346,16 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 28),
-      Text('Backup & Data Protection', style: t.titleSmall),
+      Text('Google Drive Cloud Sync', style: t.titleSmall),
       const SizedBox(height: 4),
-      Text('Android Auto-Backup is active. Your warranties and bills back up with your Google account when device backup is enabled.',
+      Text('Securely back up your bills and warranties to your own Google Drive storage.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      _DriveSyncCard(s),
+      const SizedBox(height: 28),
+      Text('Device Backup', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Android Auto-Backup is enabled. Files also back up automatically when Android device backup is active.',
           style: t.bodyMedium),
       const SizedBox(height: 28),
       OutlinedButton(
@@ -1561,6 +1569,275 @@ class BuiltByFooter extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DriveSyncCard extends StatefulWidget {
+  final Store store;
+  const _DriveSyncCard(this.store);
+
+  @override
+  State<_DriveSyncCard> createState() => _DriveSyncCardState();
+}
+
+class _DriveSyncCardState extends State<_DriveSyncCard> {
+  bool _busy = false;
+  String? _statusMessage;
+  bool? _statusOk;
+
+  @override
+  void initState() {
+    super.initState();
+    DriveSyncService.signInSilently().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _handleSignIn() async {
+    setState(() => _busy = true);
+    try {
+      await DriveSyncService.signIn();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Google Sign-In cancelled or failed.';
+          _statusOk = false;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    setState(() => _busy = true);
+    await DriveSyncService.signOut();
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _statusMessage = null;
+        _statusOk = null;
+      });
+    }
+  }
+
+  Future<void> _handleBackup() async {
+    setState(() {
+      _busy = true;
+      _statusMessage = null;
+    });
+    final res = await DriveSyncService.backup(widget.store);
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _statusMessage = res.message;
+        _statusOk = res.ok;
+      });
+    }
+  }
+
+  Future<void> _handleRestore() async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore from Drive?'),
+        content: const Text(
+          'This will download and merge bills from your Google Drive into your local library.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Restore')),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+
+    setState(() {
+      _busy = true;
+      _statusMessage = null;
+    });
+    final res = await DriveSyncService.restore(widget.store);
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _statusMessage = res.message;
+        _statusOk = res.ok;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = DriveSyncService.currentUser;
+
+    return Glass(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Pal.blue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(CupertinoIcons.cloud_upload_fill, color: Pal.blue, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user != null ? (user.displayName ?? 'Google Connected') : 'Google Account',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user != null ? user.email : 'Sign in to sync bills & PDFs',
+                      style: const TextStyle(color: Pal.muted, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (user == null)
+                AppleBounce(
+                  onTap: _busy ? null : _handleSignIn,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Pal.blue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                  ),
+                )
+              else
+                IconButton(
+                  icon: const Icon(CupertinoIcons.square_arrow_right, size: 18, color: Pal.muted),
+                  tooltip: 'Sign Out',
+                  onPressed: _busy ? null : _handleSignOut,
+                ),
+            ],
+          ),
+          if (user != null) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Color(0x15000000)),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppleBounce(
+                    onTap: _busy ? null : _handleBackup,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Pal.blue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(CupertinoIcons.arrow_up_circle_fill, size: 16, color: Pal.blue),
+                          const SizedBox(width: 6),
+                          Text(
+                            _busy ? 'Syncing...' : 'Backup to Drive',
+                            style: const TextStyle(
+                              color: Pal.blue,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppleBounce(
+                    onTap: _busy ? null : _handleRestore,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(CupertinoIcons.arrow_down_circle_fill, size: 16, color: Pal.ink),
+                          SizedBox(width: 6),
+                          Text(
+                            'Restore',
+                            style: TextStyle(
+                              color: Pal.ink,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _statusOk == true
+                    ? Pal.green.withValues(alpha: 0.12)
+                    : Pal.brick.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _statusOk == true
+                        ? CupertinoIcons.checkmark_circle_fill
+                        : CupertinoIcons.exclamationmark_circle_fill,
+                    size: 15,
+                    color: _statusOk == true ? Pal.green : Pal.brick,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusMessage!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _statusOk == true ? Pal.green : Pal.brick,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
