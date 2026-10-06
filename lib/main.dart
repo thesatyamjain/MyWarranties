@@ -1504,8 +1504,15 @@ class BuiltByFooter extends StatelessWidget {
 
   Future<void> _launch() async {
     final uri = Uri.parse(_url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(uri);
+      } catch (_) {}
     }
   }
 
