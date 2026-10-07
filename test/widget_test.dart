@@ -34,6 +34,17 @@ void main() {
     expect(at(90).status, WStatus.active);
     expect(at(30).status, WStatus.expiringSoon);
     expect(at(-5).status, WStatus.expired);
+
+    expect(countdown(-5), 'Expired');
+    expect(countdown(-1584), 'Expired');
+    expect(countdown(0), 'Expires today');
+    expect(countdown(15), '15 d left');
+    expect(countdown(790), '2 yr 2 mo left');
+
+    expect(expiredRelative(-1), 'Expired yesterday');
+    expect(expiredRelative(-15), 'Expired 15 d ago');
+    expect(expiredRelative(-76), 'Expired 2 mo ago');
+    expect(expiredRelative(-1584), 'Expired 4 yr 4 mo ago');
   });
 
   test('products without explicit terms start empty for AI search, not hardcoded presets', () {

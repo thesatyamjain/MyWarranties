@@ -192,10 +192,30 @@ class Item {
 bool isPdf(String path) => path.toLowerCase().endsWith('.pdf');
 
 String countdown(int days) {
-  if (days < 0) return 'Expired ${-days} d ago';
+  if (days < 0) return 'Expired';
   if (days == 0) return 'Expires today';
   if (days < 60) return '$days d left';
+
+  final totalMonths = (days / 30.4375).round();
+  if (totalMonths >= 12) {
+    final y = totalMonths ~/ 12;
+    final m = totalMonths % 12;
+    return m == 0 ? '$y yr left' : '$y yr $m mo left';
+  }
+
   final m = days ~/ 30;
   final d = days % 30;
   return d == 0 ? '$m mo left' : '$m mo $d d left';
+}
+
+String expiredRelative(int days) {
+  if (days >= 0) return countdown(days);
+  final ago = -days;
+  if (ago == 1) return 'Expired yesterday';
+  if (ago < 30) return 'Expired $ago d ago';
+  final totalMonths = (ago / 30.4375).round();
+  if (totalMonths < 12) return 'Expired $totalMonths mo ago';
+  final y = totalMonths ~/ 12;
+  final m = totalMonths % 12;
+  return m == 0 ? 'Expired $y yr${y > 1 ? 's' : ''} ago' : 'Expired $y yr $m mo ago';
 }

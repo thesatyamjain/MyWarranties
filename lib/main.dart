@@ -1060,8 +1060,18 @@ class Detail extends StatelessWidget {
         ),
         body: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 32), children: [
           Text(i.name, style: t.headlineSmall),
-          const SizedBox(height: 10),
-          Align(alignment: Alignment.centerLeft, child: StatusPill(i)),
+          Row(
+            children: [
+              StatusPill(i),
+              if (i.status == WStatus.expired) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '(${expiredRelative(i.daysLeft)})',
+                  style: const TextStyle(fontSize: 12, color: Pal.brick, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 20),
           LiquidGlassCard(
             padding: const EdgeInsets.all(16),
