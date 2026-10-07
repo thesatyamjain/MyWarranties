@@ -2105,6 +2105,16 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
   String? _statusMessage;
   bool? _statusOk;
 
+  @override
+  void initState() {
+    super.initState();
+    if (DriveSyncService.currentUser == null && DriveSyncService.isSignedIn) {
+      DriveSyncService.signInSilently().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
   Future<void> _handleSignIn() async {
     setState(() => _busy = true);
     try {
@@ -2181,7 +2191,9 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
 
   @override
   Widget build(BuildContext context) {
-    final user = DriveSyncService.currentUser;
+    final isSignedIn = DriveSyncService.isSignedIn;
+    final displayName = DriveSyncService.userDisplayName;
+    final displayEmail = DriveSyncService.userEmail;
 
     return Glass(
       padding: const EdgeInsets.all(16),
@@ -2205,19 +2217,19 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user != null ? (user.displayName ?? 'Google Connected') : 'Google Account',
+                      isSignedIn ? displayName : 'Google Account',
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      user != null ? user.email : 'Sign in to sync bills & PDFs',
+                      isSignedIn ? displayEmail : 'Sign in to sync bills & PDFs',
                       style: const TextStyle(color: Pal.muted, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              if (user == null)
+              if (!isSignedIn)
                 AppleBounce(
                   onTap: _busy ? null : _handleSignIn,
                   child: Container(
@@ -2250,7 +2262,7 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
                 ),
             ],
           ),
-          if (user == null) ...[
+          if (!isSignedIn) ...[
             const SizedBox(height: 14),
             const Divider(height: 1, color: Color(0x15000000)),
             const SizedBox(height: 12),
@@ -2284,7 +2296,7 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
               ],
             ),
           ],
-          if (user != null) ...[
+          if (isSignedIn) ...[
             const SizedBox(height: 14),
             const Divider(height: 1, color: Color(0x15000000)),
             const SizedBox(height: 12),

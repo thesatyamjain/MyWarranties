@@ -30,18 +30,25 @@ class DriveSyncService {
 
   static const _prefAutoSync = 'drive_auto_sync_enabled';
   static const _prefSignedInEmail = 'drive_signed_in_email';
+  static const _prefSignedInName = 'drive_signed_in_name';
   static const _prefLastSync = 'drive_last_sync_timestamp';
 
   static bool _autoSyncEnabled = false;
   static DateTime? _lastSyncTime;
   static bool _isSyncing = false;
+  static String? _savedEmail;
+  static String? _savedName;
 
   static GoogleSignInAccount? get currentUser => _currentUser;
+  static bool get isSignedIn => _currentUser != null || (_savedEmail != null && _savedEmail!.isNotEmpty);
+  static String get userEmail => _currentUser?.email ?? _savedEmail ?? '';
+  static String get userDisplayName => _currentUser?.displayName ?? _savedName ?? 'Google Account';
+  static String? get savedEmail => _savedEmail;
   static bool get isAutoSyncEnabled => _autoSyncEnabled;
   static DateTime? get lastSyncTime => _lastSyncTime;
   static bool get isSyncing => _isSyncing;
 
-  /// Load persisted auto-sync settings and restore session silently if auto-sync was active
+  /// Load persisted sync and sign-in settings, restoring session silently
   static Future<void> initPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -50,8 +57,9 @@ class DriveSyncService {
       if (lastMs != null) {
         _lastSyncTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
       }
-      final savedEmail = prefs.getString(_prefSignedInEmail);
-      if (savedEmail != null && _autoSyncEnabled) {
+      _savedEmail = prefs.getString(_prefSignedInEmail);
+      _savedName = prefs.getString(_prefSignedInName);
+      if (_savedEmail != null && _savedEmail!.isNotEmpty) {
         await signInSilently();
       }
     } catch (e) {
@@ -76,6 +84,19 @@ class DriveSyncService {
         serverClientId: serverClientId,
       );
       _initialized = true;
+
+      // Synchronize state when authentication stream events fire
+      _google.authenticationEvents.listen((event) {
+        if (event is GoogleSignInAuthenticationEventSignIn) {
+          _currentUser = event.user;
+          _savedEmail = event.user.email;
+          _savedName = event.user.displayName;
+        } else if (event is GoogleSignInAuthenticationEventSignOut) {
+          _currentUser = null;
+          _savedEmail = null;
+          _savedName = null;
+        }
+      });
     } catch (e) {
       debugPrint('GoogleSignIn init error: $e');
     }
@@ -88,6 +109,13 @@ class DriveSyncService {
       final acc = await _google.attemptLightweightAuthentication();
       if (acc != null) {
         _currentUser = acc;
+        _savedEmail = acc.email;
+        _savedName = acc.displayName;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefSignedInEmail, acc.email);
+        if (acc.displayName != null) {
+          await prefs.setString(_prefSignedInName, acc.displayName!);
+        }
       }
       return _currentUser;
     } catch (e) {
@@ -102,9 +130,23 @@ class DriveSyncService {
     try {
       final acc = await _google.authenticate(scopeHint: _scopes);
       _currentUser = acc;
+      _savedEmail = acc.email;
+      _savedName = acc.displayName;
+
+      // Authorize scopes immediately in the same interactive gesture
+      // so user isn't prompted again later on backup or sync!
+      try {
+        await acc.authorizationClient.authorizeScopes(_scopes);
+      } catch (e) {
+        debugPrint('Scope authorization notice: $e');
+      }
+
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_prefSignedInEmail, acc.email);
+        if (acc.displayName != null) {
+          await prefs.setString(_prefSignedInName, acc.displayName!);
+        }
         // Default auto-sync to true if user hasn't toggled it yet
         if (prefs.getBool(_prefAutoSync) == null) {
           _autoSyncEnabled = true;
@@ -124,10 +166,13 @@ class DriveSyncService {
     try {
       await _google.signOut();
       _currentUser = null;
+      _savedEmail = null;
+      _savedName = null;
       _autoSyncEnabled = false;
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(_prefSignedInEmail);
+        await prefs.remove(_prefSignedInName);
         await prefs.setBool(_prefAutoSync, false);
       } catch (_) {}
     } catch (e) {
@@ -145,7 +190,16 @@ class DriveSyncService {
     }
     if (account == null) return null;
 
-    final authz = await account.authorizationClient.authorizeScopes(_scopes);
+    // Check if scopes are already authorized without prompting
+    GoogleSignInClientAuthorization? authz =
+        await account.authorizationClient.authorizationForScopes(_scopes);
+
+    // If not authorized yet, request authorization only if interactive mode allowed
+    if (authz == null) {
+      if (!allowInteractive) return null;
+      authz = await account.authorizationClient.authorizeScopes(_scopes);
+    }
+
     final authClient = authz.authClient(scopes: _scopes);
     return drive.DriveApi(authClient);
   }
