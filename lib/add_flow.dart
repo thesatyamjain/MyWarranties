@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:open_filex/open_filex.dart';
+import 'package:pdfx/pdfx.dart' as px;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
@@ -535,6 +537,7 @@ class _ProcessingState extends State<ProcessingScreen> with SingleTickerProvider
   late AnimationController _scanController;
   int _stepIndex = 0;
   Timer? _stepTimer;
+  px.PdfPageImage? _pdfThumbnail;
 
   static const _telemetrySteps = [
     (
@@ -575,7 +578,32 @@ class _ProcessingState extends State<ProcessingScreen> with SingleTickerProvider
       }
     });
 
+    if (isPdf(widget.file.path)) {
+      _loadPdfThumbnail();
+    }
+
     _run();
+  }
+
+  Future<void> _loadPdfThumbnail() async {
+    try {
+      final doc = await px.PdfDocument.openFile(widget.file.path);
+      final page = await doc.getPage(1);
+      final pageImage = await page.render(
+        width: page.width * 2,
+        height: page.height * 2,
+        format: px.PdfPageImageFormat.jpeg,
+      );
+      await page.close();
+      await doc.close();
+      if (mounted && pageImage != null) {
+        setState(() {
+          _pdfThumbnail = pageImage;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error rasterizing PDF preview: $e');
+    }
   }
 
   @override
@@ -685,27 +713,46 @@ class _ProcessingState extends State<ProcessingScreen> with SingleTickerProvider
                               width: 240,
                               height: 280,
                               child: isPdf(widget.file.path)
-                                  ? Container(
-                                      color: Pal.paper,
-                                      alignment: Alignment.center,
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(CupertinoIcons.doc_richtext, size: 64, color: Pal.blue),
-                                          const SizedBox(height: 10),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                                            child: Text(
-                                              widget.file.uri.pathSegments.last,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                            ),
+                                  ? (_pdfThumbnail != null
+                                      ? Image.memory(
+                                          _pdfThumbnail!.bytes,
+                                          fit: BoxFit.cover,
+                                          width: 240,
+                                          height: 280,
+                                        )
+                                      : Container(
+                                          color: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                width: 64,
+                                                height: 64,
+                                                decoration: BoxDecoration(
+                                                  color: Pal.blue.withValues(alpha: 0.12),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Center(
+                                                  child: Icon(CupertinoIcons.doc_richtext, size: 34, color: Pal.blue),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                widget.file.uri.pathSegments.last,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Pal.ink),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Text(
+                                                'PDF Document',
+                                                style: TextStyle(fontSize: 11, color: Pal.muted, fontWeight: FontWeight.w500),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    )
+                                        ))
                                   : Image.file(
                                       widget.file,
                                       fit: BoxFit.cover,
@@ -976,10 +1023,14 @@ class _ReviewState extends State<ReviewScreen> {
   late final Map<String, double> conf;
   late final List<_Row> rows;
   bool saving = false;
+  px.PdfPageImage? _pdfThumbnail;
 
   @override
   void initState() {
     super.initState();
+    if (isPdf(widget.file.path)) {
+      _loadPdfThumbnail();
+    }
     final ex = widget.ex;
     conf = {for (final k in ['seller', 'invoice_no', 'purchase_date', 'total_amount']) k: ex.conf(k)};
     final manual = ex.raw.isEmpty || ex.items.length == 1 && ex.items.first.isEmpty;
@@ -1123,6 +1174,27 @@ class _ReviewState extends State<ReviewScreen> {
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
   }
 
+  Future<void> _loadPdfThumbnail() async {
+    try {
+      final doc = await px.PdfDocument.openFile(widget.file.path);
+      final page = await doc.getPage(1);
+      final pageImage = await page.render(
+        width: page.width * 2,
+        height: page.height * 2,
+        format: px.PdfPageImageFormat.jpeg,
+      );
+      await page.close();
+      await doc.close();
+      if (mounted && pageImage != null) {
+        setState(() {
+          _pdfThumbnail = pageImage;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error rasterizing PDF preview in review: $e');
+    }
+  }
+
   void _openInvoicePreview() {
     showDialog(
       context: context,
@@ -1160,25 +1232,156 @@ class _ReviewState extends State<ReviewScreen> {
                   height: MediaQuery.of(ctx).size.height * 0.65,
                   width: double.infinity,
                   child: isPdf(widget.file.path)
-                      ? Container(
-                          color: Pal.paper,
-                          alignment: Alignment.center,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(CupertinoIcons.doc_richtext, size: 64, color: Pal.blue),
-                              const SizedBox(height: 12),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
-                                child: Text(
-                                  widget.file.uri.pathSegments.last,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                      ? (_pdfThumbnail != null
+                          ? Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: InteractiveViewer(
+                                    minScale: 0.8,
+                                    maxScale: 5.0,
+                                    child: Image.memory(
+                                      _pdfThumbnail!.bytes,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
                                 ),
+                                Positioned(
+                                  left: 12,
+                                  right: 12,
+                                  bottom: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.92),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Pal.line),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.08),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                widget.file.uri.pathSegments.last,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Pal.ink),
+                                              ),
+                                              const Text(
+                                                'Pinch to zoom page 1',
+                                                style: TextStyle(fontSize: 10, color: Pal.muted),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        FilledButton.icon(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: Pal.blue,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            visualDensity: VisualDensity.compact,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          icon: const Icon(CupertinoIcons.arrow_up_right_square, size: 14),
+                                          label: const Text('Open Full PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                          onPressed: () async {
+                                            try {
+                                              final res = await OpenFilex.open(widget.file.path);
+                                              if (res.type != ResultType.done) {
+                                                final uri = Uri.file(widget.file.path);
+                                                if (await canLaunchUrl(uri)) {
+                                                  await launchUrl(uri);
+                                                }
+                                              }
+                                            } catch (e) {
+                                              debugPrint('Error opening invoice PDF: $e');
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Container(
+                              color: Pal.paper,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 84,
+                                    height: 84,
+                                    decoration: BoxDecoration(
+                                      color: Pal.blue.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(CupertinoIcons.doc_richtext, size: 44, color: Pal.blue),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Text(
+                                    widget.file.uri.pathSegments.last,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      color: Pal.ink,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'PDF invoice document (${(widget.file.lengthSync() / 1024).toStringAsFixed(1)} KB)',
+                                    style: const TextStyle(fontSize: 12, color: Pal.muted),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Pal.blue,
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size.fromHeight(48),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(CupertinoIcons.arrow_up_right_square, size: 18),
+                                    label: const Text(
+                                      'Open PDF in System Viewer',
+                                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        final res = await OpenFilex.open(widget.file.path);
+                                        if (res.type != ResultType.done) {
+                                          final uri = Uri.file(widget.file.path);
+                                          if (await canLaunchUrl(uri)) {
+                                            await launchUrl(uri);
+                                          }
+                                        }
+                                      } catch (e) {
+                                        debugPrint('Error opening invoice PDF: $e');
+                                      }
+                                    },
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        )
+                            ))
                       : InteractiveViewer(
                           minScale: 0.8,
                           maxScale: 5.0,
@@ -1229,6 +1432,7 @@ class _ReviewState extends State<ReviewScreen> {
         // 1. Interactive Original Invoice Inspector Card
         _InvoiceDocumentPeek(
           file: widget.file,
+          pdfThumbnail: _pdfThumbnail,
           onInspect: _openInvoicePreview,
         ),
 
@@ -1887,10 +2091,12 @@ class SourceChip extends StatelessWidget {
 
 class _InvoiceDocumentPeek extends StatelessWidget {
   final File file;
+  final px.PdfPageImage? pdfThumbnail;
   final VoidCallback onInspect;
 
   const _InvoiceDocumentPeek({
     required this.file,
+    this.pdfThumbnail,
     required this.onInspect,
   });
 
@@ -1910,11 +2116,18 @@ class _InvoiceDocumentPeek extends StatelessWidget {
               width: 44,
               height: 44,
               child: pdf
-                  ? Container(
-                      color: Pal.blue.withValues(alpha: 0.12),
-                      alignment: Alignment.center,
-                      child: const Icon(CupertinoIcons.doc_richtext, size: 24, color: Pal.blue),
-                    )
+                  ? (pdfThumbnail != null
+                      ? Image.memory(
+                          pdfThumbnail!.bytes,
+                          fit: BoxFit.cover,
+                          width: 44,
+                          height: 44,
+                        )
+                      : Container(
+                          color: Pal.blue.withValues(alpha: 0.12),
+                          alignment: Alignment.center,
+                          child: const Icon(CupertinoIcons.doc_richtext, size: 24, color: Pal.blue),
+                        ))
                   : Image.file(file, fit: BoxFit.cover),
             ),
           ),
