@@ -2319,7 +2319,7 @@ class _DriveSyncCardState extends State<_DriveSyncCard> {
                         : (val) async {
                             await DriveSyncService.setAutoSyncEnabled(val);
                             if (val) {
-                              DriveSyncService.autoBackup(widget.store);
+                              DriveSyncService.autoSync(widget.store);
                             }
                             if (mounted) setState(() {});
                           },

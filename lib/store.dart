@@ -45,6 +45,9 @@ class Store extends ChangeNotifier {
       _initNotifications();
     }
     await DriveSyncService.initPrefs();
+    if (DriveSyncService.isAutoSyncEnabled) {
+      DriveSyncService.autoSync(this);
+    }
     WidgetBridge.sync(this);
   }
 

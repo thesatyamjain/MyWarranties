@@ -367,6 +367,95 @@ class DriveSyncService {
     }
   }
 
+  /// True 2-Way Auto-Sync:
+  /// 1. Silently pulls and merges any remote additions from Google Drive.
+  /// 2. Automatically backs up any local changes that aren't on Drive yet.
+  static Future<void> autoSync(Store store) async {
+    if (!_autoSyncEnabled || _isSyncing) return;
+    _isSyncing = true;
+    try {
+      final api = await _getDriveApi(allowInteractive: false);
+      if (api == null) return;
+
+      final folderId = await _getOrCreateFolder(api);
+
+      // 1. Locate remote backup.json
+      final query = "name = '$_backupJsonFileName' and '$folderId' in parents and trashed = false";
+      final files = await api.files.list(q: query, spaces: 'drive');
+      if (files.files != null && files.files!.isNotEmpty) {
+        final jsonFileId = files.files!.first.id!;
+        final drive.Media media = await api.files.get(
+          jsonFileId,
+          downloadOptions: drive.DownloadOptions.fullMedia,
+        ) as drive.Media;
+
+        final bytes = <int>[];
+        await for (final chunk in media.stream) {
+          bytes.addAll(chunk);
+        }
+
+        final j = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+        final remoteBills = [for (final b in (j['bills'] as List? ?? [])) Bill.fromJson(b)];
+        final remoteItems = [for (final i in (j['items'] as List? ?? [])) Item.fromJson(i)];
+
+        final docsDir = await getApplicationDocumentsDirectory();
+        final allFolderFiles = await api.files.list(
+          q: "'$folderId' in parents and trashed = false",
+          spaces: 'drive',
+          $fields: 'files(id, name)',
+        );
+        final remoteFileMap = {
+          for (final f in (allFolderFiles.files ?? []))
+            if (f.name != null && f.id != null) f.name!: f.id!
+        };
+
+        bool hasNewRemote = false;
+        for (final bill in remoteBills) {
+          final expectedName = File(bill.imagePath).uri.pathSegments.last;
+          final targetLocalFile = File('${docsDir.path}/$expectedName');
+          bill.imagePath = targetLocalFile.path;
+
+          if (!await targetLocalFile.exists() && remoteFileMap.containsKey(expectedName)) {
+            final fileId = remoteFileMap[expectedName]!;
+            final drive.Media fileMedia = await api.files.get(
+              fileId,
+              downloadOptions: drive.DownloadOptions.fullMedia,
+            ) as drive.Media;
+
+            final sink = targetLocalFile.openWrite();
+            await sink.addStream(fileMedia.stream);
+            await sink.close();
+          }
+
+          if (!store.bills.any((b) => b.id == bill.id)) {
+            store.bills.add(bill);
+            hasNewRemote = true;
+          }
+        }
+
+        for (final ri in remoteItems) {
+          if (!store.items.any((i) => i.id == ri.id)) {
+            store.items.add(ri);
+            hasNewRemote = true;
+          }
+        }
+
+        if (hasNewRemote) {
+          await store.update();
+          debugPrint('Auto-sync: successfully pulled and merged remote items from Google Drive');
+        }
+      }
+
+      // 2. Upload any local items not yet on Drive
+      _isSyncing = false;
+      await autoBackup(store);
+    } catch (e) {
+      debugPrint('Auto-sync error: $e');
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
   static String _formatDriveError(dynamic e, String action) {
     final str = e.toString();
     if (str.contains('16') || str.contains('Cancelled by user') || str.contains('access_denied') || str.contains('403')) {
