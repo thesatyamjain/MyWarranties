@@ -124,4 +124,17 @@ void main() {
     expect(store.trashedItems.length, 1);
     expect(store.trashedItems.first.id, 'iRecent');
   });
+
+  test('recent warranties only includes non-expired active items', () {
+    final now = DateTime.now();
+    final expiredItem = Item('i1', 'b1', 'Old Phone', 'Samsung', '', '', 'Electronics', 10000, now.subtract(const Duration(days: 400)), [Term('Standard', 12, TermSource.bill)]);
+    final activeItem = Item('i2', 'b1', 'New Laptop', 'Apple', '', '', 'Electronics', 80000, now.subtract(const Duration(days: 30)), [Term('Standard', 12, TermSource.bill)]);
+
+    final all = [expiredItem, activeItem];
+    final recent = all.where((i) => i.status != WStatus.expired).toList().reversed.take(4).toList();
+
+    expect(recent.length, 1);
+    expect(recent.first.id, 'i2');
+    expect(recent.any((i) => i.id == 'i1'), false);
+  });
 }

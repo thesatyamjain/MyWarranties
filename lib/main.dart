@@ -413,7 +413,7 @@ class Home extends StatelessWidget {
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     final soon = live.where((i) => i.status == WStatus.expiringSoon).toList();
     final expired = active.where((i) => i.status == WStatus.expired).toList();
-    final recent = active.reversed.take(4).toList();
+    final recent = active.where((i) => i.status != WStatus.expired).toList().reversed.take(4).toList();
     final next = live.firstOrNull;
 
     // Categories breakdown
@@ -770,26 +770,49 @@ class Home extends StatelessWidget {
         ],
 
         // 5. Recently Added Feed
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Recent Warranties', style: t.titleSmall),
-            TextButton(
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
-              onPressed: onLibrary,
-              child: const Row(
-                children: [
-                  Text('See all', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  SizedBox(width: 2),
-                  Icon(CupertinoIcons.chevron_right, size: 12),
-                ],
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Recent Warranties', style: t.titleSmall),
+              TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                onPressed: onLibrary,
+                child: const Row(
+                  children: [
+                    Text('See all', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    SizedBox(width: 2),
+                    Icon(CupertinoIcons.chevron_right, size: 12),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        for (final i in recent) ItemTile(s, i),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final i in recent) ItemTile(s, i),
+        ] else if (expired.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Expired Warranties', style: t.titleSmall),
+              TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                onPressed: onLibrary,
+                child: const Row(
+                  children: [
+                    Text('See Library', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    SizedBox(width: 2),
+                    Icon(CupertinoIcons.chevron_right, size: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final i in expired.reversed.take(4)) ItemTile(s, i),
+        ],
       ],
     );
   }
