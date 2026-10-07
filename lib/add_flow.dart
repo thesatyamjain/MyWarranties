@@ -1078,7 +1078,11 @@ class _ReviewState extends State<ReviewScreen> {
 
   void _autoSearchWarranties() {
     for (final r in rows) {
-      if (r.terms.isEmpty &&
+      final isGeneric = r.terms.length <= 1 &&
+          (r.terms.isEmpty ||
+              r.terms.first.label.toLowerCase() == 'comprehensive' ||
+              r.terms.first.label.toLowerCase() == 'product');
+      if ((r.terms.isEmpty || r.aiSummary == null || isGeneric) &&
           (r.name.text.trim().isNotEmpty || r.brand.text.trim().isNotEmpty)) {
         _searchRowWarranty(r);
       }

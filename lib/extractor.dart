@@ -256,6 +256,41 @@ class DefaultBillExtractor implements BillExtractor {
       final text = jsonDecode(res.body)['candidates'][0]['content']['parts'][0]['text'];
       final j = jsonDecode(text) as Map<String, dynamic>;
       if (j['is_bill'] == false) throw NotABill();
+
+      final sellerName = (j['seller'] is Map ? j['seller']['value'] : '')?.toString() ?? '';
+      final itemsList = (j['items'] as List? ?? []);
+
+      // Deep AI Warranty Research in parallel for all extracted items
+      await Future.wait(itemsList.map((item) async {
+        if (item is! Map) return;
+        final pName = (item['product_name'] ?? '').toString().trim();
+        final pBrand = (item['brand'] ?? '').toString().trim();
+        final pModel = (item['model'] ?? '').toString().trim();
+        if (pName.isNotEmpty || pBrand.isNotEmpty) {
+          try {
+            final policy = await queryProductWarrantyPolicy(
+              productName: pName,
+              brand: pBrand,
+              model: pModel,
+              seller: sellerName,
+              apiKey: effectiveKey,
+            ).timeout(const Duration(seconds: 15));
+
+            if (policy.terms.isNotEmpty) {
+              item['standard_warranty_terms'] = policy.terms;
+            }
+            if (policy.summary.isNotEmpty) {
+              item['warranty_summary'] = policy.summary;
+            }
+            if (policy.support != null && policy.support!.isNotEmpty) {
+              item['support_contact'] = policy.support;
+            }
+          } catch (_) {
+            // Keep OCR standard_warranty_terms fallback if dedicated policy research times out
+          }
+        }
+      }));
+
       return Extraction(j);
     } on SocketException {
       throw const SocketException('No internet connection. Please check your network and try again.');
