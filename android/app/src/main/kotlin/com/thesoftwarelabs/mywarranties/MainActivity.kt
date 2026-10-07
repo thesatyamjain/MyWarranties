@@ -46,39 +46,76 @@ class MainActivity : FlutterActivity() {
 
         // Native Package Installer Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.thesoftwarelabs.mywarranties/installer").setMethodCallHandler { call, result ->
-            if (call.method == "installApk") {
-                val filePath = call.argument<String>("filePath")
-                if (filePath.isNullOrEmpty()) {
-                    result.error("INVALID_PATH", "File path is empty", null)
-                    return@setMethodCallHandler
+            when (call.method) {
+                "canInstallPackages" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        result.success(packageManager.canRequestPackageInstalls())
+                    } else {
+                        result.success(true)
+                    }
                 }
-
-                try {
-                    val file = File(filePath)
-                    if (!file.exists()) {
-                        result.error("NOT_FOUND", "File does not exist: $filePath", null)
+                "openInstallSettings" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val intent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                            result.success(true)
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.error("SETTINGS_ERROR", e.message, null)
+                    }
+                }
+                "installApk" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath.isNullOrEmpty()) {
+                        result.error("INVALID_PATH", "File path is empty", null)
                         return@setMethodCallHandler
                     }
 
-                    val apkUri: Uri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
+                    try {
+                        val file = File(filePath)
+                        if (!file.exists()) {
+                            result.error("NOT_FOUND", "File does not exist: $filePath", null)
+                            return@setMethodCallHandler
+                        }
 
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        // Check unknown sources permission on Android 8+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                            val settingsIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(settingsIntent)
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+
+                        val apkUri: Uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file
+                        )
+
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(apkUri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+
+                        context.startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("INSTALL_ERROR", e.message, null)
                     }
-
-                    context.startActivity(intent)
-                    result.success(true)
-                } catch (e: Exception) {
-                    result.error("INSTALL_ERROR", e.message, null)
                 }
-            } else {
-                result.notImplemented()
+                else -> {
+                    result.notImplemented()
+                }
             }
         }
 

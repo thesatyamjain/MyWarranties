@@ -201,6 +201,26 @@ class OtaUpdateService {
     }
   }
 
+  /// Checks if the app currently has permission to install unknown apps
+  static Future<bool> canInstallPackages() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      const channel = MethodChannel('com.thesoftwarelabs.mywarranties/installer');
+      return await channel.invokeMethod<bool>('canInstallPackages') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Opens system setting page to allow installing unknown apps
+  static Future<void> openInstallSettings() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      const channel = MethodChannel('com.thesoftwarelabs.mywarranties/installer');
+      await channel.invokeMethod<void>('openInstallSettings');
+    } catch (_) {}
+  }
+
   /// Prompts Android Package Installer to install the downloaded APK
   static Future<bool> installApk(String filePath) async {
     if (kIsWeb) return false;
@@ -680,40 +700,82 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
                 ],
               ),
             ] else if (_downloadedFilePath != null) ...[
-              // Download finished, ready to re-trigger install
+              // Download completed state: Clean, seamless Install Now
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: Pal.paper,
-                      borderRadius: BorderRadius.circular(Pal.r),
+                      color: Pal.green.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Pal.green.withValues(alpha: 0.2)),
                     ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Icon(CupertinoIcons.info_circle, size: 18, color: Pal.muted),
-                        SizedBox(width: 8),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Pal.green.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(CupertinoIcons.checkmark_alt,
+                              color: Pal.green, size: 20),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            'Package downloaded. If Android says "App not installed", uninstall any previous debug version first, then tap Open Installer below.',
-                            style: TextStyle(fontSize: 12, color: Pal.muted, height: 1.35),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_release?.tagName ?? "Update"} Ready to Install',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: Pal.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Downloaded securely and verified.',
+                                style: TextStyle(
+                                  color: Pal.muted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
+                      final canInstall = await OtaUpdateService.canInstallPackages();
+                      if (!canInstall) {
+                        await OtaUpdateService.openInstallSettings();
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Enable "Allow from this source" in Settings, then tap Install Update.',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
                       final ok = await OtaUpdateService.installApk(_downloadedFilePath!);
                       if (!ok && mounted) {
                         messenger.showSnackBar(
                           SnackBar(
                             content: const Text(
-                              'Could not launch installer. Use "Download via Browser" below or open from Files app.',
+                              'Installation paused. If prompted, tap Settings and allow installation.',
                             ),
                             behavior: SnackBarBehavior.floating,
                             backgroundColor: Pal.brick,
@@ -721,33 +783,43 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
                         );
                       }
                     },
-                    icon: const Icon(CupertinoIcons.play_arrow_solid, size: 16),
-                    label: const Text('Open Package Installer'),
+                    icon: const Icon(CupertinoIcons.arrow_down_circle_fill, size: 18),
+                    label: const Text('Install Update Now'),
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Pal.r)),
+                        borderRadius: BorderRadius.circular(Pal.r),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  if (_release?.apkUrl.isNotEmpty == true)
-                    OutlinedButton.icon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(_release!.apkUrl),
-                        mode: LaunchMode.externalApplication,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_release?.apkUrl.isNotEmpty == true) ...[
+                        TextButton.icon(
+                          onPressed: () => launchUrl(
+                            Uri.parse(_release!.apkUrl),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(CupertinoIcons.globe, size: 14),
+                          label: const Text('Browser download'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Pal.muted,
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const Text(' · ', style: TextStyle(color: Pal.line)),
+                      ],
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Pal.muted,
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                        child: const Text('Done'),
                       ),
-                      icon: const Icon(CupertinoIcons.globe, size: 16),
-                      label: const Text('Download via Browser'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(42),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(Pal.r)),
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Done'),
+                    ],
                   ),
                 ],
               ),
