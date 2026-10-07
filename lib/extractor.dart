@@ -34,7 +34,7 @@ Return ONLY JSON of this shape. Use null when not printed/known. confidence is 0
  "payment_mode":{"value":str,"confidence":n},
  "items":[{"product_name":str,"brand":str,"model":str,"serial_no":str,"price":number,
            "printed_warranty":str or null,
-           "standard_warranty_terms":[{"label":str,"months":number,"source":"brand" or "estimated"}],
+           "standard_warranty_terms":[{"label":str,"months":number,"source":"brand" or "ai_search"}],
            "warranty_summary":str or null,
            "support_contact":str or null,
            "confidence":n}]}
@@ -57,7 +57,7 @@ CRITICAL RULES FOR "standard_warranty_terms" (Determine real-world official manu
    - [{"label":"Comprehensive","months":12,"source":"brand"},{"label":"Display Panel","months":24,"source":"brand"}]
 5. Audio & Wearables (Apple, Sony, boAt, Noise, Fire-Boltt, JBL):
    - Standard 12 months.
-6. If the specific brand and model offers an extended or non-standard duration (e.g. Duracell power bank = 24 months), use that exact duration with "source":"brand".
+6. If the specific brand offers verified manufacturer coverage, use "source":"brand". For any other AI researched products, use "source":"ai_search". NEVER output "estimated".
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 

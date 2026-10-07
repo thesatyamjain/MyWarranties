@@ -41,6 +41,16 @@ void main() {
     expect(terms, isEmpty);
   });
 
+  test('TermSource.aiSearch replaces estimated with AI search label', () {
+    final aiTerm = Term('Comprehensive', 12, TermSource.aiSearch);
+    expect(sourceLabel[aiTerm.source], 'AI Search');
+
+    // Backward compatibility: legacy 'estimated' in stored DB json maps to aiSearch
+    final migrated = Term.fromJson({'l': 'Comprehensive', 'm': 12, 's': 'estimated'});
+    expect(migrated.source, TermSource.aiSearch);
+    expect(sourceLabel[migrated.source], 'AI Search');
+  });
+
   test('drive auto sync pref toggling and state', () async {
     SharedPreferences.setMockInitialValues({'drive_auto_sync_enabled': true});
     await DriveSyncService.initPrefs();

@@ -1060,7 +1060,7 @@ class _ReviewState extends State<ReviewScreen> {
                   (t['months'] as num).toInt(),
                   t['source'] == 'bill'
                       ? TermSource.bill
-                      : (t['source'] == 'estimated' ? TermSource.estimated : TermSource.brand),
+                      : (t['source'] == 'brand' ? TermSource.brand : TermSource.aiSearch),
                 ),
             if ((i['standard_warranty_terms'] as List? ?? []).isEmpty)
               ...parsePrinted(i['printed_warranty'] as String?),
@@ -1115,7 +1115,8 @@ class _ReviewState extends State<ReviewScreen> {
             r.terms = res.terms.map((t) {
               final label = (t['label'] ?? 'Product').toString();
               final months = (t['months'] as num?)?.toInt() ?? 12;
-              return Term(label, months, TermSource.brand);
+              final src = t['source'] == 'brand' ? TermSource.brand : TermSource.aiSearch;
+              return Term(label, months, src);
             }).toList();
           }
           r.aiSummary = res.summary.isNotEmpty ? res.summary : null;
@@ -2077,14 +2078,50 @@ class SourceChip extends StatelessWidget {
   const SourceChip(this.s, {super.key});
   @override
   Widget build(BuildContext context) {
-    final est = s == TermSource.estimated;
+    final isAi = s == TermSource.aiSearch;
+    final isBill = s == TermSource.bill;
+    final isBrand = s == TermSource.brand;
+
+    final Color bg;
+    final Color fg;
+    final IconData icon;
+
+    if (isBill) {
+      bg = Pal.greenBg;
+      fg = Pal.green;
+      icon = CupertinoIcons.doc_checkmark_fill;
+    } else if (isBrand) {
+      bg = Pal.greenBg;
+      fg = Pal.green;
+      icon = CupertinoIcons.checkmark_seal_fill;
+    } else if (isAi) {
+      bg = Pal.blue.withValues(alpha: 0.12);
+      fg = Pal.blue;
+      icon = CupertinoIcons.sparkles;
+    } else {
+      bg = Pal.line.withValues(alpha: 0.5);
+      fg = Pal.muted;
+      icon = CupertinoIcons.pencil_ellipsis_rectangle;
+    }
+
     return Container(
       margin: const EdgeInsets.only(top: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       decoration: BoxDecoration(
-          color: est ? Pal.amberBg : Pal.greenBg, borderRadius: BorderRadius.circular(8)),
-      child: Text(sourceLabel[s]!,
-          style: TextStyle(fontSize: 12, color: est ? Pal.amber : Pal.green)),
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            sourceLabel[s]!,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+          ),
+        ],
+      ),
     );
   }
 }

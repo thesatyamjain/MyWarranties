@@ -1,11 +1,11 @@
 enum WStatus { active, expiringSoon, expired }
 
-enum TermSource { bill, brand, estimated, manual }
+enum TermSource { bill, brand, aiSearch, manual }
 
 const sourceLabel = {
   TermSource.bill: 'From bill',
   TermSource.brand: 'Brand policy',
-  TermSource.estimated: 'Estimated',
+  TermSource.aiSearch: 'AI Search',
   TermSource.manual: 'Entered by you',
 };
 
@@ -25,8 +25,15 @@ class Term {
   Term(this.label, this.months, this.source);
 
   Map<String, dynamic> toJson() => {'l': label, 'm': months, 's': source.name};
-  factory Term.fromJson(Map<String, dynamic> j) => Term(
-      j['l'], j['m'], TermSource.values.byName(j['s']));
+  factory Term.fromJson(Map<String, dynamic> j) {
+    final sStr = j['s'] as String?;
+    final s = sStr == 'estimated' || sStr == 'aiSearch'
+        ? TermSource.aiSearch
+        : (sStr != null
+            ? (TermSource.values.where((v) => v.name == sStr).firstOrNull ?? TermSource.brand)
+            : TermSource.brand);
+    return Term(j['l'], j['m'], s);
+  }
 }
 
 class Bill {
