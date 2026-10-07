@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,7 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart';
 
 /// Single source of truth for the installed application version
-const String kCurrentAppVersion = '1.1.7';
+const String kCurrentAppVersion = '1.1.17';
 
 class ReleaseInfo {
   final String tagName;
@@ -203,6 +204,19 @@ class OtaUpdateService {
   /// Prompts Android Package Installer to install the downloaded APK
   static Future<bool> installApk(String filePath) async {
     if (kIsWeb) return false;
+
+    // 1. Try native platform channel with direct FileProvider
+    if (Platform.isAndroid) {
+      try {
+        const channel = MethodChannel('com.thesoftwarelabs.mywarranties/installer');
+        final success = await channel.invokeMethod<bool>('installApk', {'filePath': filePath});
+        if (success == true) return true;
+      } catch (e) {
+        debugPrint('Native installer channel attempt failed: $e, falling back to open_filex');
+      }
+    }
+
+    // 2. Fallback to OpenFilex
     try {
       final result = await OpenFilex.open(
         filePath,
@@ -692,8 +706,21 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
                   ),
                   const SizedBox(height: 14),
                   FilledButton.icon(
-                    onPressed: () =>
-                        OtaUpdateService.installApk(_downloadedFilePath!),
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final ok = await OtaUpdateService.installApk(_downloadedFilePath!);
+                      if (!ok && mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Could not launch installer. Use "Download via Browser" below or open from Files app.',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Pal.brick,
+                          ),
+                        );
+                      }
+                    },
                     icon: const Icon(CupertinoIcons.play_arrow_solid, size: 16),
                     label: const Text('Open Package Installer'),
                     style: FilledButton.styleFrom(

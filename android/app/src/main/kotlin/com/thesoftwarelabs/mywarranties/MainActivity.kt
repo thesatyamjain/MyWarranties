@@ -44,6 +44,44 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        // Native Package Installer Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.thesoftwarelabs.mywarranties/installer").setMethodCallHandler { call, result ->
+            if (call.method == "installApk") {
+                val filePath = call.argument<String>("filePath")
+                if (filePath.isNullOrEmpty()) {
+                    result.error("INVALID_PATH", "File path is empty", null)
+                    return@setMethodCallHandler
+                }
+
+                try {
+                    val file = File(filePath)
+                    if (!file.exists()) {
+                        result.error("NOT_FOUND", "File does not exist: $filePath", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val apkUri: Uri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    context.startActivity(intent)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("INSTALL_ERROR", e.message, null)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
+
         // Incoming Share Channel (WhatsApp, Gallery, Files, etc.)
         shareMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL).apply {
             setMethodCallHandler { call, result ->
