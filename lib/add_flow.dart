@@ -84,21 +84,21 @@ Future<void> startAddFlow(BuildContext context, Store store) async {
       final addMore = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('Page ${captured.length} Captured'),
+          title: Text(captured.length == 1 ? 'Page 1 Photo Taken' : '${captured.length} Pages Captured'),
           content: Text(
             captured.length == 1
-                ? 'Does this bill have another page or backside (warranty terms, IMEI, store seal)?'
-                : 'You have captured ${captured.length} pages. Add another page or proceed to processing?',
+                ? 'Does your bill have another page or a backside (warranty terms, IMEI, or shop stamp)?'
+                : 'Captured ${captured.length} pages. Add another page or finish and save?',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Done (${captured.length} page${captured.length > 1 ? "s" : ""})'),
+              child: Text(captured.length == 1 ? 'Done, Save Bill' : 'Done (${captured.length} pages)'),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.pop(ctx, true),
               icon: const Icon(CupertinoIcons.camera, size: 16),
-              label: const Text('Add Page'),
+              label: const Text('Add Another Page'),
             ),
           ],
         ),
@@ -206,7 +206,7 @@ class _AddBillSheet extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Instant AI extraction from photos, PDFs, or manual entry.',
+                      'Auto-reads product name, purchase date & warranty end date.',
                       style: TextStyle(
                         fontSize: 13,
                         color: Pal.muted,
@@ -239,9 +239,9 @@ class _AddBillSheet extends StatelessWidget {
 
           // 1. Hero Primary Action: Camera Scanner
           _BentoTile(
-            title: 'Scan with Camera',
-            subtitle: 'Auto-detects seller, dates, amounts & warranty',
-            badge: 'Instant AI',
+            title: 'Take Photo of Bill',
+            subtitle: 'Camera scans bill, receipt or warranty card',
+            badge: 'Fast & Easy',
             icon: CupertinoIcons.camera_fill,
             iconBg: Pal.blue.withValues(alpha: 0.12),
             iconColor: Pal.blue,
@@ -254,8 +254,8 @@ class _AddBillSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: _BentoSquareTile(
-                  title: 'Photo Library',
-                  subtitle: 'Single or batch images',
+                  title: 'Photo Gallery',
+                  subtitle: 'Select from photos',
                   icon: CupertinoIcons.photo_on_rectangle,
                   iconBg: const Color(0xFF5856D6).withValues(alpha: 0.12),
                   iconColor: const Color(0xFF5856D6),
@@ -265,8 +265,8 @@ class _AddBillSheet extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _BentoSquareTile(
-                  title: 'Files & PDF',
-                  subtitle: 'Single or batch PDFs',
+                  title: 'PDF / Files',
+                  subtitle: 'Amazon, Flipkart invoices',
                   icon: CupertinoIcons.doc_text_fill,
                   iconBg: const Color(0xFF0071A4).withValues(alpha: 0.12),
                   iconColor: const Color(0xFF0071A4),
@@ -315,7 +315,7 @@ class _AddBillSheet extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Type product info without a bill',
+                            'Add product without a bill photo',
                             style: TextStyle(
                               fontSize: 12,
                               color: Pal.muted,

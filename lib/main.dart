@@ -238,6 +238,51 @@ class _ShellState extends State<Shell> {
             Library(s),
             SettingsScreen(s),
           ][tab]),
+          floatingActionButton: tab == 2
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 60),
+                  child: Semantics(
+                    button: true,
+                    label: 'Add a new bill',
+                    child: AppleBounce(
+                      scaleFactor: 0.94,
+                      onTap: () => startAddFlow(context, s),
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        decoration: BoxDecoration(
+                          color: Pal.blue,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Pal.blue.withValues(alpha: 0.38),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Add Bill',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           bottomNavigationBar: SafeArea(
             top: false,
             child: Align(
@@ -563,80 +608,88 @@ class Home extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: LiquidGlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: Pal.greenBg,
-                            borderRadius: BorderRadius.circular(10),
+              child: AppleBounce(
+                scaleFactor: 0.96,
+                onTap: onLibrary,
+                child: LiquidGlassCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: Pal.greenBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(CupertinoIcons.checkmark_shield_fill, color: Pal.green, size: 18),
                           ),
-                          child: const Icon(CupertinoIcons.checkmark_shield_fill, color: Pal.green, size: 18),
-                        ),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Pal.green,
-                            shape: BoxShape.circle,
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Pal.green,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      '${live.length}',
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Active Coverages', style: TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500)),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        '${live.length}',
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text('Active Coverages', style: TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: LiquidGlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: soon.isNotEmpty ? Pal.amberBg : (expired.isNotEmpty ? Pal.brickBg : Pal.greenBg),
-                            borderRadius: BorderRadius.circular(10),
+              child: AppleBounce(
+                scaleFactor: 0.96,
+                onTap: onLibrary,
+                child: LiquidGlassCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: soon.isNotEmpty ? Pal.amberBg : (expired.isNotEmpty ? Pal.brickBg : Pal.greenBg),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              soon.isNotEmpty ? CupertinoIcons.clock_fill : (expired.isNotEmpty ? CupertinoIcons.archivebox_fill : CupertinoIcons.check_mark),
+                              color: soon.isNotEmpty ? Pal.amber : (expired.isNotEmpty ? Pal.brick : Pal.green),
+                              size: 18,
+                            ),
                           ),
-                          child: Icon(
-                            soon.isNotEmpty ? CupertinoIcons.clock_fill : (expired.isNotEmpty ? CupertinoIcons.archivebox_fill : CupertinoIcons.check_mark),
-                            color: soon.isNotEmpty ? Pal.amber : (expired.isNotEmpty ? Pal.brick : Pal.green),
-                            size: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      soon.isNotEmpty ? '${soon.length}' : (expired.isNotEmpty ? '${expired.length}' : '0'),
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      soon.isNotEmpty ? 'Within 30 Days' : (expired.isNotEmpty ? 'Expired Total' : 'Action Needed'),
-                      style: const TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        soon.isNotEmpty ? '${soon.length}' : (expired.isNotEmpty ? '${expired.length}' : '0'),
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        soon.isNotEmpty ? 'Within 30 Days' : (expired.isNotEmpty ? 'Expired Total' : 'Action Needed'),
+                        style: const TextStyle(color: Pal.muted, fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -980,10 +1033,65 @@ class _LibraryState extends State<Library> {
       ),
       if (list.isEmpty)
         Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Center(
-                child: Text(all.isEmpty ? 'Your library is empty.' : 'Nothing matches these filters.',
-                    style: t.bodyMedium)))
+          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Pal.paper,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    all.isEmpty ? CupertinoIcons.archivebox : CupertinoIcons.search,
+                    size: 26,
+                    color: Pal.muted,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  all.isEmpty ? 'No warranties saved yet' : 'No matching warranties found',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  all.isEmpty
+                      ? 'Scan your bill or receipt to start tracking warranties.'
+                      : 'Try searching with a different brand, model, or seller name.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Pal.muted, fontSize: 13, height: 1.3),
+                ),
+                if (all.isEmpty) ...[
+                  const SizedBox(height: 20),
+                  AppleBounce(
+                    onTap: () => startAddFlow(context, widget.s),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                      decoration: BoxDecoration(
+                        color: Pal.blue,
+                        borderRadius: BorderRadius.circular(Pal.r),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Scan Bill Now',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        )
       else
         for (final i in list) ItemTile(widget.s, i),
     ]);
@@ -1072,7 +1180,162 @@ class Detail extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          // 3 Big Primary Quick Actions for Non-Tech Users
+          Row(
+            children: [
+              // 1. View Bill
+              Expanded(
+                child: AppleBounce(
+                  scaleFactor: 0.95,
+                  onTap: bill == null
+                      ? null
+                      : () {
+                          if (isPdf(bill.imagePath)) {
+                            openBillPdf(bill);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => Scaffold(
+                                  backgroundColor: Colors.black,
+                                  appBar: AppBar(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  body: Center(
+                                    child: InteractiveViewer(
+                                      maxScale: 5,
+                                      child: Image.file(File(bill.imagePath)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: bill != null ? Pal.blue : Pal.paper,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: bill != null
+                          ? [
+                              BoxShadow(
+                                color: Pal.blue.withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.doc_text_fill,
+                          size: 20,
+                          color: bill != null ? Colors.white : Pal.muted,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'View Bill',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: bill != null ? Colors.white : Pal.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // 2. Brand Support / Helpline
+              Expanded(
+                child: AppleBounce(
+                  scaleFactor: 0.95,
+                  onTap: () => openSupport(i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Pal.green.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Pal.green.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.phone_fill,
+                          size: 20,
+                          color: Pal.green,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Helpline',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Pal.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // 3. Share Bill
+              Expanded(
+                child: AppleBounce(
+                  scaleFactor: 0.95,
+                  onTap: () {
+                    if (bill != null) {
+                      shareBillPdf(i, bill);
+                    } else {
+                      shareMyWarrantyCard(i, bill);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Pal.paper,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.share,
+                          size: 20,
+                          color: Pal.ink,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Share Bill',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Pal.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           LiquidGlassCard(
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1555,33 +1818,41 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 28),
-      Text('Gemini AI Configuration', style: t.titleSmall),
+      Text('Smart AI Bill Scanner', style: t.titleSmall),
       const SizedBox(height: 4),
-      Text('Use your own Gemini API key for instant bill extraction and policy lookups.',
+      Text('Auto-reads product names, dates, amounts, and warranties from bills.',
           style: t.bodySmall),
       const SizedBox(height: 12),
       Glass(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(children: [
-            Icon(
-              s.userApiKey.isNotEmpty ? Icons.key : Icons.key_off_outlined,
-              color: s.userApiKey.isNotEmpty ? Pal.green : Pal.muted,
-              size: 24,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Pal.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                CupertinoIcons.sparkles,
+                color: Pal.green,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(
                   s.userApiKey.isNotEmpty
-                      ? 'Custom API Key active (•••${s.userApiKey.length > 4 ? s.userApiKey.substring(s.userApiKey.length - 4) : ""})'
-                      : 'No custom key configured',
+                      ? 'Custom Gemini Key (Active)'
+                      : 'Built-in AI Scanner Active',
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 Text(
                   s.userApiKey.isNotEmpty
-                      ? 'Saved securely on this device'
-                      : 'Will fall back to build-time key if available',
+                      ? 'Using personal API key (•••${s.userApiKey.length > 4 ? s.userApiKey.substring(s.userApiKey.length - 4) : ""})'
+                      : 'Free built-in scanner works out of the box',
                   style: const TextStyle(color: Pal.muted, fontSize: 12),
                 ),
               ]),
@@ -1595,7 +1866,7 @@ class SettingsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8.0),
                 ),
                 child: Text(
-                  s.userApiKey.isNotEmpty ? 'Edit' : 'Add Key',
+                  s.userApiKey.isNotEmpty ? 'Edit' : 'Advanced',
                   style: const TextStyle(
                       color: Pal.blue, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
@@ -1769,8 +2040,8 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Enter your Google Gemini API key to enable AI bill parsing. Keys remain private on your device.',
-                    style: TextStyle(fontSize: 13),
+                    'The app works out of the box with the built-in scanner. Adding a personal Google Gemini key is completely optional for developers and power users.',
+                    style: TextStyle(fontSize: 13, height: 1.35),
                   ),
                   const SizedBox(height: 12),
                   TextField(
