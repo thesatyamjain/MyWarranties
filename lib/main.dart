@@ -10,7 +10,6 @@ import 'api_key_guide.dart';
 import 'batch_queue.dart';
 import 'detail_tools.dart';
 import 'drive_sync.dart';
-import 'extractor.dart';
 import 'models.dart';
 import 'recycle_bin.dart';
 import 'share_receiver.dart';

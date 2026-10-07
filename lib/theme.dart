@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 /// border or shadow, one system-blue accent, semantic system colors for status.
 /// ponytail: SF Pro cannot ship on Android/web, so Inter stands in for it.
 class Pal {
-  static const paper = Color(0xFFF2F2F7); // systemGroupedBackground
+  static const paper = Color(0xFFECF0F9); // matches brand icon background seamlessly
   static const card = Color(0xFFFFFFFF);
   static const ink = Color(0xFF000000);
   static const muted = Color(0xFF6C6C70); // 4.7:1 on paper
