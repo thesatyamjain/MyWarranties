@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'add_flow.dart';
+import 'api_key_guide.dart';
 import 'batch_queue.dart';
 import 'detail_tools.dart';
 import 'drive_sync.dart';
@@ -1858,7 +1859,7 @@ class SettingsScreen extends StatelessWidget {
               ]),
             ),
             AppleBounce(
-              onTap: () => _editApiKey(context, s),
+              onTap: () => showApiKeySetupSheet(context, s),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -1866,7 +1867,7 @@ class SettingsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8.0),
                 ),
                 child: Text(
-                  s.userApiKey.isNotEmpty ? 'Edit' : 'Advanced',
+                  s.userApiKey.isNotEmpty ? 'Edit' : 'Setup Key',
                   style: const TextStyle(
                       color: Pal.blue, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
@@ -2020,141 +2021,6 @@ class SettingsScreen extends StatelessWidget {
       const SizedBox(height: 36),
       const BuiltByFooter(),
     ]);
-  }
-
-  void _editApiKey(BuildContext context, Store s) {
-    final controller = TextEditingController(text: s.userApiKey);
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        bool testing = false;
-        String? testResult;
-        bool? testSuccess;
-
-        return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            title: const Text('Gemini API Key'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'The app works out of the box with the built-in scanner. Adding a personal Google Gemini key is completely optional for developers and power users.',
-                    style: TextStyle(fontSize: 13, height: 1.35),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      hintText: 'AIzaSy...',
-                      border: OutlineInputBorder(),
-                      labelText: 'API Key',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Test Key Action
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          minimumSize: const Size(0, 36),
-                        ),
-                        onPressed: testing
-                            ? null
-                            : () async {
-                                final text = controller.text.trim();
-                                if (text.isEmpty) {
-                                  setState(() {
-                                    testResult = 'Please enter a key first.';
-                                    testSuccess = false;
-                                  });
-                                  return;
-                                }
-                                setState(() {
-                                  testing = true;
-                                  testResult = null;
-                                  testSuccess = null;
-                                });
-                                final res = await testApiKey(text);
-                                setState(() {
-                                  testing = false;
-                                  testResult = res.message;
-                                  testSuccess = res.ok;
-                                });
-                              },
-                        icon: testing
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(CupertinoIcons.checkmark_shield, size: 16),
-                        label: Text(testing ? 'Testing...' : 'Test Key'),
-                      ),
-                    ],
-                  ),
-                  if (testResult != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: testSuccess == true
-                            ? Pal.green.withValues(alpha: 0.12)
-                            : Pal.brick.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            testSuccess == true
-                                ? CupertinoIcons.check_mark_circled_solid
-                                : CupertinoIcons.exclamationmark_circle_fill,
-                            size: 16,
-                            color: testSuccess == true ? Pal.green : Pal.brick,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              testResult!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: testSuccess == true ? Pal.green : Pal.brick,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              if (s.userApiKey.isNotEmpty)
-                TextButton(
-                  onPressed: () async {
-                    await s.setApiKey('');
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Clear', style: TextStyle(color: Colors.red)),
-                ),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              FilledButton(
-                onPressed: () async {
-                  await s.setApiKey(controller.text.trim());
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }
 

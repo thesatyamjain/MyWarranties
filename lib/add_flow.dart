@@ -13,6 +13,7 @@ import 'package:pdfx/pdfx.dart' as px;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import 'api_key_guide.dart';
 import 'batch_queue.dart';
 import 'extractor.dart';
 import 'models.dart';
@@ -916,6 +917,26 @@ class _ProcessingState extends State<ProcessingScreen> with SingleTickerProvider
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 18),
+                        if (error?.toLowerCase().contains('api key') == true ||
+                            error?.toLowerCase().contains('gemini') == true ||
+                            error?.toLowerCase().contains('quota') == true) ...[
+                          FilledButton.icon(
+                            onPressed: () async {
+                              final updated = await showApiKeySetupSheet(context, widget.store);
+                              if (updated == true && mounted) {
+                                _run();
+                              }
+                            },
+                            icon: const Icon(CupertinoIcons.sparkles, size: 16),
+                            label: const Text('Setup Free AI Key (1 Min)'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Pal.blue,
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Pal.r)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         Row(
                           children: [
                             Expanded(
