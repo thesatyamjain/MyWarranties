@@ -1,6 +1,8 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoSwitch;
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoSwitch;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +13,7 @@ import 'batch_queue.dart';
 import 'detail_tools.dart';
 import 'drive_sync.dart';
 import 'models.dart';
+import 'ota_update.dart';
 import 'recycle_bin.dart';
 import 'share_receiver.dart';
 import 'store.dart';
@@ -115,6 +118,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int tab = 0;
+  Timer? _otaTimer;
 
   @override
   void initState() {
@@ -122,6 +126,24 @@ class _ShellState extends State<Shell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ShareReceiver.initialize(context, widget.store);
+        _checkOtaUpdateOnLaunch();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _otaTimer?.cancel();
+    super.dispose();
+  }
+
+  void _checkOtaUpdateOnLaunch() {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) return;
+    _otaTimer = Timer(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      final release = await OtaUpdateService.checkOnLaunchThrottled();
+      if (release != null && mounted) {
+        showOtaUpdateSheet(context, initialRelease: release, manualCheck: false);
       }
     });
   }
@@ -2002,6 +2024,56 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       Text(
                         'Clean temp exports and inspect invoice memory',
+                        style: TextStyle(color: Pal.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(CupertinoIcons.chevron_right, size: 16, color: Pal.muted),
+              ],
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 28),
+      Text('Software Update', style: t.titleSmall),
+      const SizedBox(height: 4),
+      Text('Check for over-the-air updates and install new releases directly.',
+          style: t.bodySmall),
+      const SizedBox(height: 12),
+      AppleBounce(
+        onTap: () => showOtaUpdateSheet(context, manualCheck: true),
+        child: Glass(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Pal.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      CupertinoIcons.arrow_down_circle_fill,
+                      size: 18,
+                      color: Pal.blue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Check for Updates (OTA)',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      Text(
+                        'Current version v$kCurrentAppVersion · In-app installer',
                         style: TextStyle(color: Pal.muted, fontSize: 12),
                       ),
                     ],

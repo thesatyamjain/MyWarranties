@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_warranties/drive_sync.dart';
 import 'package:my_warranties/models.dart';
+import 'package:my_warranties/ota_update.dart';
 import 'package:my_warranties/resolver.dart';
 import 'package:my_warranties/store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -136,5 +137,41 @@ void main() {
     expect(recent.length, 1);
     expect(recent.first.id, 'i2');
     expect(recent.any((i) => i.id == 'i1'), false);
+  });
+
+  test('OTA version comparison correctly detects newer releases', () {
+    expect(OtaUpdateService.compareVersions('v1.1.14', '1.1.7') > 0, true);
+    expect(OtaUpdateService.compareVersions('v1.1.7', '1.1.7') == 0, true);
+    expect(OtaUpdateService.compareVersions('1.1.6', 'v1.1.7') < 0, true);
+    expect(OtaUpdateService.compareVersions('v2.0.0', '1.9.99') > 0, true);
+    expect(OtaUpdateService.compareVersions('v1.2.0+10', '1.1.9+5') > 0, true);
+  });
+
+  test('ReleaseInfo parses GitHub release payload and finds APK asset', () {
+    final mockJson = {
+      'tag_name': 'v1.1.14',
+      'name': 'My Warranties v1.1.14',
+      'body': 'Bug fixes and performance improvements',
+      'html_url': 'https://github.com/thesatyamjain/MyWarranties/releases/tag/v1.1.14',
+      'published_at': '2026-10-06T17:09:38Z',
+      'assets': [
+        {
+          'name': 'my_warranties_web.tar.gz',
+          'size': 1000,
+          'browser_download_url': 'https://example.com/web.tar.gz',
+        },
+        {
+          'name': 'my_warranties_android_v1.1.14.apk',
+          'size': 65345312,
+          'browser_download_url': 'https://example.com/app.apk',
+        },
+      ],
+    };
+
+    final release = ReleaseInfo.fromJson(mockJson);
+    expect(release.tagName, 'v1.1.14');
+    expect(release.title, 'My Warranties v1.1.14');
+    expect(release.apkUrl, 'https://example.com/app.apk');
+    expect(release.apkSize, 65345312);
   });
 }
