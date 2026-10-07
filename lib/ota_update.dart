@@ -156,8 +156,18 @@ class OtaUpdateService {
       }
 
       final total = resp.contentLength ?? 0;
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/my_warranties_update.apk';
+      Directory dir;
+      try {
+        final extDirs = await getExternalCacheDirectories();
+        if (extDirs != null && extDirs.isNotEmpty) {
+          dir = extDirs.first;
+        } else {
+          dir = await getExternalStorageDirectory() ?? await getTemporaryDirectory();
+        }
+      } catch (_) {
+        dir = await getTemporaryDirectory();
+      }
+      final filePath = '${dir.path}/my_warranties_update.apk';
       final file = File(filePath);
 
       if (await file.exists()) {
@@ -660,6 +670,27 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Pal.paper,
+                      borderRadius: BorderRadius.circular(Pal.r),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(CupertinoIcons.info_circle, size: 18, color: Pal.muted),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Package downloaded. If Android says "App not installed", uninstall any previous debug version first, then tap Open Installer below.',
+                            style: TextStyle(fontSize: 12, color: Pal.muted, height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   FilledButton.icon(
                     onPressed: () =>
                         OtaUpdateService.installApk(_downloadedFilePath!),
@@ -671,6 +702,21 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
                           borderRadius: BorderRadius.circular(Pal.r)),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  if (_release?.apkUrl.isNotEmpty == true)
+                    OutlinedButton.icon(
+                      onPressed: () => launchUrl(
+                        Uri.parse(_release!.apkUrl),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(CupertinoIcons.globe, size: 16),
+                      label: const Text('Download via Browser'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(42),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(Pal.r)),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
