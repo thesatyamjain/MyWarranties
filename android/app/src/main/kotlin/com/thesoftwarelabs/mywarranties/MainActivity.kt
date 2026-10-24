@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -181,10 +182,27 @@ class MainActivity : FlutterActivity() {
         val resultPaths = mutableListOf<String>()
         for (uri in uris) {
             try {
-                var ext = if (type.contains("pdf", ignoreCase = true)) ".pdf" else ".jpg"
+                // Try resolving actual display name from ContentResolver
+                var displayName: String? = null
+                if (uri.scheme == "content") {
+                    try {
+                        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                if (nameIndex >= 0) {
+                                    displayName = cursor.getString(nameIndex)
+                                }
+                            }
+                        }
+                    } catch (_) {}
+                }
+
+                val lowerDisplayName = (displayName ?: "").lowercase()
                 val uriString = uri.toString().lowercase()
                 val pathString = (uri.path ?: "").lowercase()
-                if (uriString.endsWith(".mywarranty") || pathString.endsWith(".mywarranty")) {
+
+                var ext = if (type.contains("pdf", ignoreCase = true)) ".pdf" else ".jpg"
+                if (lowerDisplayName.endsWith(".mywarranty") || uriString.endsWith(".mywarranty") || pathString.endsWith(".mywarranty")) {
                     ext = ".mywarranty"
                 }
 

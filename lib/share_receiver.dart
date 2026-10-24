@@ -58,12 +58,25 @@ class ShareReceiver {
   /// Route shared files:
   /// - If `.mywarranty`: prompt 1-click import into vault (item + countdown + embedded bill).
   /// - If image/PDF: route to ProcessingScreen for OCR / AI scanning.
-  static void handleIncomingSharedFiles(BuildContext context, Store store, List<String> paths) {
+  static Future<void> handleIncomingSharedFiles(BuildContext context, Store store, List<String> paths) async {
     for (final p in paths) {
       final file = File(p);
       if (!file.existsSync()) continue;
 
-      if (p.toLowerCase().endsWith('.mywarranty')) {
+      bool isWarrantyBundle = p.toLowerCase().endsWith('.mywarranty');
+      if (!isWarrantyBundle) {
+        // Fallback: Inspect file content in case WhatsApp/File manager stripped or altered the extension
+        try {
+          final sample = await file.openRead(0, 512).transform(utf8.decoder).join();
+          if (sample.contains('"format"') && sample.contains('"mywarranty"')) {
+            isWarrantyBundle = true;
+          }
+        } catch (_) {}
+      }
+
+      if (!context.mounted) return;
+
+      if (isWarrantyBundle) {
         _importMyWarrantyCard(context, store, file);
       } else {
         Navigator.push(
