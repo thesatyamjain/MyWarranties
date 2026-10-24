@@ -294,7 +294,7 @@ class DriveSyncService {
 
       return (
         ok: true,
-        message: 'Successfully backed up ${store.items.length} items to Google Drive.',
+        message: 'Successfully backed up ${store.items.length} items${uploadedFiles > 0 ? ' and $uploadedFiles documents' : ''} to Google Drive.',
         count: store.items.length,
       );
     } catch (e) {

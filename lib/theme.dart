@@ -1,6 +1,5 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -371,7 +370,10 @@ class _AppleBounceState extends State<AppleBounce> with SingleTickerProviderStat
   }
 
   void _onTapDown(TapDownDetails _) {
-    if (widget.onTap != null) _controller.forward();
+    if (widget.onTap != null) {
+      HapticFeedback.selectionClick();
+      _controller.forward();
+    }
   }
 
   void _onTapUp(TapUpDetails _) {

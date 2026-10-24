@@ -18,6 +18,7 @@ import 'recycle_bin.dart';
 import 'share_receiver.dart';
 import 'store.dart';
 import 'theme.dart';
+import 'widget_bridge.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,8 +30,19 @@ void main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Uncaught Flutter error: ${details.exceptionAsString()}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught platform error: $error\n$stack');
+    return true;
+  };
+
   final store = Store();
   try {
+    await initAppVersion();
     await store.load();
     await BatchQueueController.instance.load();
   } catch (e, st) {
@@ -59,6 +71,38 @@ class App extends StatelessWidget {
             theme: buildTheme(),
             scrollBehavior: const MaterialScrollBehavior()
                 .copyWith(physics: const BouncingScrollPhysics()),
+            builder: (context, child) {
+              if (kReleaseMode) {
+                ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
+                  return Material(
+                    color: Pal.paper,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.shield_outlined, size: 48, color: Pal.muted),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Something went wrong',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: Pal.ink),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'An unexpected layout error occurred. Your warranty data remains completely safe.',
+                              style: TextStyle(fontSize: 13, color: Pal.muted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                };
+              }
+              return child ?? const SizedBox.shrink();
+            },
             home: store.onboarded ? Shell(store) : Onboarding(store),
           ),
         ),
@@ -514,9 +558,19 @@ class Home extends StatelessWidget {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
-      children: [
+    return RefreshIndicator.adaptive(
+      onRefresh: () async {
+        HapticFeedback.lightImpact();
+        await s.load();
+        if (DriveSyncService.isAutoSyncEnabled) {
+          await DriveSyncService.autoSync(s);
+        }
+        WidgetBridge.sync(s);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+        children: [
         // 1. Vault Header Card (Hero Apple Liquid Glass Prism)
         AppleBounce(
           scaleFactor: 0.98,
@@ -836,6 +890,7 @@ class Home extends StatelessWidget {
           for (final i in expired.reversed.take(4)) ItemTile(s, i),
         ],
       ],
+      ),
     );
   }
 
@@ -941,10 +996,17 @@ class Library extends StatefulWidget {
 }
 
 class _LibraryState extends State<Library> {
+  final _searchController = TextEditingController();
   String q = '';
   WStatus? status;
   String? category, brand;
   bool newestFirst = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -982,7 +1044,16 @@ class _LibraryState extends State<Library> {
           child: FilterChip(label: Text(label), selected: on, onSelected: (_) => tap()),
         );
     final trashedCount = widget.s.trashedItems.length;
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 96), children: [
+    return RefreshIndicator.adaptive(
+      onRefresh: () async {
+        HapticFeedback.lightImpact();
+        await widget.s.load();
+        WidgetBridge.sync(widget.s);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 96),
+        children: [
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1042,11 +1113,22 @@ class _LibraryState extends State<Library> {
         blur: 20,
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: TextField(
+          controller: _searchController,
+          textInputAction: TextInputAction.search,
           onChanged: (v) => setState(() => q = v),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             fillColor: Colors.transparent,
             hintText: 'Search product, brand or model',
-            prefixIcon: Icon(CupertinoIcons.search, color: Pal.blue),
+            prefixIcon: const Icon(CupertinoIcons.search, color: Pal.blue),
+            suffixIcon: q.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(CupertinoIcons.clear_circled_solid, size: 18, color: Pal.muted),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => q = '');
+                    },
+                  )
+                : null,
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -1139,7 +1221,9 @@ class _LibraryState extends State<Library> {
         )
       else
         for (final i in list) ItemTile(widget.s, i),
-    ]);
+      ],
+      ),
+    );
   }
 }
 
@@ -2064,17 +2148,17 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Check for Updates (OTA)',
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                       Text(
                         'Current version v$kCurrentAppVersion · In-app installer',
-                        style: TextStyle(color: Pal.muted, fontSize: 12),
+                        style: const TextStyle(color: Pal.muted, fontSize: 12),
                       ),
                     ],
                   ),

@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>My Warranties uses your camera to capture and scan purchase invoices, bills, and warranty cards.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>My Warranties needs access to your photos to import receipt images and PDF bills.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>My Warranties saves exported warranty cards and invoice documents to your photo library.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
 </dict>
 </plist>

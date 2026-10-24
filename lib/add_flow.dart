@@ -1586,6 +1586,7 @@ class _Field extends StatelessWidget {
         controller: c,
         onChanged: (_) => onChanged?.call(),
         onSubmitted: onSubmitted,
+        textInputAction: number ? TextInputAction.done : TextInputAction.next,
         keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : null,
         decoration: lowDecoration(label, low),
       ),

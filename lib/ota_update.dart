@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,7 +16,20 @@ import 'package:url_launcher/url_launcher.dart';
 import 'theme.dart';
 
 /// Single source of truth for the installed application version
-const String kCurrentAppVersion = '1.1.17';
+String kCurrentAppVersion = '1.1.18';
+
+/// Loads the true installed application version from PackageInfo
+Future<String> initAppVersion() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    if (info.version.isNotEmpty) {
+      kCurrentAppVersion = info.version;
+    }
+  } catch (e) {
+    debugPrint('PackageInfo error: $e');
+  }
+  return kCurrentAppVersion;
+}
 
 class ReleaseInfo {
   final String tagName;
@@ -111,6 +125,7 @@ class OtaUpdateService {
 
   /// Determines if an update is available compared to the currently running version
   static Future<({bool hasUpdate, ReleaseInfo? release})> checkForUpdate() async {
+    await initAppVersion();
     final release = await fetchLatestRelease();
     if (release == null || release.tagName.isEmpty) {
       return (hasUpdate: false, release: null);
@@ -302,6 +317,15 @@ class _OtaUpdateSheetState extends State<_OtaUpdateSheet> {
       _hasUpdate = OtaUpdateService.compareVersions(
               widget.initialRelease!.tagName, kCurrentAppVersion) >
           0;
+      initAppVersion().then((_) {
+        if (mounted) {
+          setState(() {
+            _hasUpdate = OtaUpdateService.compareVersions(
+                    widget.initialRelease!.tagName, kCurrentAppVersion) >
+                0;
+          });
+        }
+      });
     } else {
       _fetchUpdate();
     }
