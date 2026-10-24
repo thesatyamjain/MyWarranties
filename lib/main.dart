@@ -1975,13 +1975,13 @@ class SettingsScreen extends StatelessWidget {
                 Text(
                   s.userApiKey.isNotEmpty
                       ? 'Custom Gemini Key (Active)'
-                      : 'Built-in AI Scanner Active',
+                      : 'Llama 3.2 Vision (Primary & Free)',
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 Text(
                   s.userApiKey.isNotEmpty
                       ? 'Using personal API key (•••${s.userApiKey.length > 4 ? s.userApiKey.substring(s.userApiKey.length - 4) : ""})'
-                      : 'Free built-in scanner works out of the box',
+                      : 'Powered by Cloudflare Workers AI · Free for all users',
                   style: const TextStyle(color: Pal.muted, fontSize: 12),
                 ),
               ]),

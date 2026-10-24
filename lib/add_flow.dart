@@ -558,7 +558,7 @@ class _ProcessingState extends State<ProcessingScreen> with SingleTickerProvider
     ),
     (
       icon: CupertinoIcons.sparkles,
-      title: 'Consulting Gemini AI warranty intelligence...',
+      title: 'Consulting AI warranty intelligence...',
       subtitle: 'Matching official manufacturer coverage policies'
     ),
   ];

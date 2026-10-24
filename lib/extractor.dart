@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// Run with: flutter run --dart-define=GEMINI_API_KEY=xxxx
@@ -61,9 +62,12 @@ CRITICAL RULES FOR "standard_warranty_terms" (Determine real-world official manu
 Include every product line item. If the image is not a bill, return {"is_bill": false}.
 ''';
 
-/// Production proxy endpoint (e.g. Firebase Cloud Function).
-/// If specified via --dart-define=BACKEND_EXTRACT_URL=..., bills are extracted securely via backend.
-const _backendUrl = String.fromEnvironment('BACKEND_EXTRACT_URL');
+/// Cloudflare Workers AI Endpoint (Primary Engine powered by Llama 3.2 Vision)
+/// Zero configuration required by the user, runs 100% free with official warranty deduction.
+const String kDefaultLlamaEndpoint = 'https://mywarranties-ai.satyamjain.workers.dev';
+
+/// Production proxy endpoint override.
+const _backendUrl = String.fromEnvironment('BACKEND_EXTRACT_URL', defaultValue: kDefaultLlamaEndpoint);
 
 abstract class BillExtractor {
   Future<Extraction> extract(File file, {String? apiKey});
@@ -186,22 +190,64 @@ class DefaultBillExtractor implements BillExtractor {
 
   @override
   Future<Extraction> extract(File file, {String? apiKey}) async {
-    // 1. If backend proxy is configured, use secure Cloud Function backend
-    if (_backendUrl.isNotEmpty) {
-      final req = http.MultipartRequest('POST', Uri.parse(_backendUrl))
-        ..files.add(await http.MultipartFile.fromPath('file', file.path));
-      final streamed = await req.send().timeout(const Duration(seconds: 45));
-      final res = await http.Response.fromStream(streamed);
-      if (res.statusCode != 200) throw HttpException('Extraction failed (${res.statusCode})');
-      final j = jsonDecode(res.body) as Map<String, dynamic>;
-      if (j['is_bill'] == false) throw NotABill();
-      return Extraction(j);
+    final hasUserGeminiKey = apiKey != null && apiKey.trim().isNotEmpty;
+
+    // 1. If user explicitly provided their personal Gemini API key, use Gemini directly
+    if (hasUserGeminiKey) {
+      try {
+        return await _extractViaGemini(file, apiKey.trim());
+      } catch (e) {
+        debugPrint('Personal Gemini key failed: $e, falling back to primary Llama 3.2 Vision');
+      }
     }
 
-    final effectiveKey = (apiKey != null && apiKey.trim().isNotEmpty) ? apiKey.trim() : _key;
-    if (effectiveKey.isEmpty) {
-      throw StateError('Missing Gemini API Key. Open Settings > Gemini AI Configuration to enter your key.');
+    // 2. Primary Engine: Cloudflare Workers AI with Llama 3.2 Vision (100% Free, zero config)
+    if (_backendUrl.isNotEmpty) {
+      try {
+        final bytes = await file.readAsBytes();
+        final base64Image = base64Encode(bytes);
+        final isPdf = file.path.toLowerCase().endsWith('.pdf');
+        final mimeType = isPdf ? 'application/pdf' : 'image/jpeg';
+
+        final client = http.Client();
+        final res = await client.post(
+          Uri.parse(_backendUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Connection': 'close',
+          },
+          body: jsonEncode({
+            'image': base64Image,
+            'mimeType': mimeType,
+          }),
+        ).timeout(const Duration(seconds: 45));
+        client.close();
+
+        if (res.statusCode == 200) {
+          final j = jsonDecode(res.body) as Map<String, dynamic>;
+          if (j['is_bill'] == false) throw NotABill();
+          return Extraction(j);
+        } else {
+          debugPrint('Llama 3.2 Vision endpoint failed (${res.statusCode}): ${res.body}');
+        }
+      } catch (e) {
+        if (e is NotABill) rethrow;
+        debugPrint('Primary Llama 3.2 Vision error: $e');
+      }
     }
+
+    // 3. Fallback: If Llama failed and a Gemini key is available in environment or user settings
+    final effectiveKey = hasUserGeminiKey ? apiKey.trim() : _key;
+    if (effectiveKey.isNotEmpty) {
+      return await _extractViaGemini(file, effectiveKey);
+    }
+
+    throw StateError(
+      'Unable to scan invoice. The primary Llama AI scanner was unreachable. Please check your internet connection or configure a Gemini API key in Settings.',
+    );
+  }
+
+  Future<Extraction> _extractViaGemini(File file, String effectiveKey) async {
 
     // Build model list: cached first, followed by standard fallback candidates
     final candidateModels = DefaultBillExtractor.candidateModels();
