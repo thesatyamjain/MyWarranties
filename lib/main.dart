@@ -16,6 +16,7 @@ import 'models.dart';
 import 'ota_update.dart';
 import 'recycle_bin.dart';
 import 'share_receiver.dart';
+import 'splash_screen.dart';
 import 'store.dart';
 import 'theme.dart';
 import 'widget_bridge.dart';
@@ -53,7 +54,8 @@ void main() async {
 
 class App extends StatelessWidget {
   final Store store;
-  const App(this.store, {super.key});
+  final bool enableSplash;
+  const App(this.store, {super.key, this.enableSplash = true});
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
@@ -103,7 +105,11 @@ class App extends StatelessWidget {
               }
               return child ?? const SizedBox.shrink();
             },
-            home: store.onboarded ? Shell(store) : Onboarding(store),
+            home: SplashWrapper(
+              store: store,
+              enabled: enableSplash,
+              child: store.onboarded ? Shell(store) : Onboarding(store),
+            ),
           ),
         ),
       );
