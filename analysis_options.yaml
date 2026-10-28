@@ -4,8 +4,9 @@ analyzer:
   exclude:
     - build/**
     - .dart_tool/**
+  errors:
+    unnecessary_import: ignore
 
 linter:
   rules:
     # avoid_print: false
-    # prefer_single_quotes: true
