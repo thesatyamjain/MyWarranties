@@ -194,7 +194,7 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
                         }
-                    } catch (_) {}
+                    } catch (e: Exception) {}
                 }
 
                 val lowerDisplayName = (displayName ?: "").lowercase()
